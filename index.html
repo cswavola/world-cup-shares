@@ -27,10 +27,13 @@
     button { border: none; background: none; cursor: pointer; font-family: inherit; }
   </style>
 
-  <!-- Libraries from CDN (loaded on your friends' phones, not bundled) -->
+<!-- Libraries: CDN first, local vendored copies as fallback (offline / corporate) -->
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script>window.React || document.write('<script src="react.min.js"><\/script>');</script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script>window.ReactDOM || document.write('<script src="react-dom.min.js"><\/script>');</script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script>window.Babel || document.write('<script src="babel.min.js"><\/script>');</script>
 </head>
 <body>
   <div id="root"><div id="boot">Loading WC26 Shares…</div></div>
