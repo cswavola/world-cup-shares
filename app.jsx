@@ -616,6 +616,12 @@ const BINGO_FALLBACK = [
   "Commentator calls the bluff",
 ];
 
+const btn = (outline) => ({
+  flex: 1, padding: 10, borderRadius: 10, fontWeight: 700, fontSize: 14,
+  background: outline ? T.card : T.green, color: outline ? T.green : "#fff",
+  border: `1px solid ${T.green}`,
+});
+
 function shuffle(arr) {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
