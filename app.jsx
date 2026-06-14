@@ -8,6 +8,7 @@
 
 const { useState, useEffect, useMemo } = React;
 
+
 /* ---- charts, drawn in plain SVG (no chart library) ---- */
 function RaceChart({ data, players }) {
   const W = 320, H = 190, P = { l: 26, r: 8, t: 8, b: 16 };
@@ -70,6 +71,8 @@ const Plus = (p) => <Svg {...p}><path d="M5 12h14" /><path d="M12 5v14" /></Svg>
 const Minus = (p) => <Svg {...p}><path d="M5 12h14" /></Svg>;
 const X = (p) => <Svg {...p}><path d="M18 6 6 18" /><path d="m6 6 12 12" /></Svg>;
 const User = (p) => <Svg {...p}><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></Svg>;
+const Grid = (p) => <Svg {...p}><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></Svg>;
+
 
 const T = {
   bg: "#F4F6F1", ink: "#16251D", sub: "#5C6B61", green: "#1F6B4A",
@@ -815,6 +818,263 @@ function ExportButton({ state }) {
   );
 }
 
+// =====================================================================
+// BINGO — paste this block into app.jsx, just before the App() function
+// =====================================================================
+
+const BINGO_LS_KEY = "wc26-bingo-v1";
+const BINGO_SIZE = 5; // 5×5 grid
+const BINGO_CELLS = BINGO_SIZE * BINGO_SIZE; // 25
+const FREE_INDEX = Math.floor(BINGO_CELLS / 2); // 12 — centre cell
+
+const BINGO_FALLBACK = [
+  "Goalie ponch",
+  "Own goal",
+  "Ball to space",
+  "Too many wheaties",
+  "That doesn't belong there",
+  "You might be wondering how I got here",
+  "Inconvenient ref",
+  "Spicy coach",
+  "Orbital strike",
+  "Just f my s up (dumb haircut)",
+  "I've never been here before",
+  "Protect face or groin",
+  "I didn't know <celebrity> was from <country>",
+  "Surprise Canadian (only allowed for Canada games)",
+  "Nobody liked that",
+  "God helped me",
+  "Big man upstairs loves the footie",
+  "Lazarus",
+  "Stream freezes at worst possible moment",
+  "Total whiff",
+  "And the award for best supporting actor goes to...",
+  "Commentator calls the bluff",
+];
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function makeBingoCard(squares) {
+  // Pick 24 random squares, insert FREE in the middle
+  const picked = shuffle(squares).slice(0, BINGO_CELLS - 1);
+  const cells = [...picked];
+  cells.splice(FREE_INDEX, 0, "FREE");
+  return cells;
+}
+
+function checkBingo(marked) {
+  const s = BINGO_SIZE;
+  const lines = [];
+  // rows
+  for (let r = 0; r < s; r++) lines.push(Array.from({ length: s }, (_, c) => r * s + c));
+  // cols
+  for (let c = 0; c < s; c++) lines.push(Array.from({ length: s }, (_, r) => r * s + c));
+  // diagonals
+  lines.push(Array.from({ length: s }, (_, i) => i * s + i));
+  lines.push(Array.from({ length: s }, (_, i) => i * s + (s - 1 - i)));
+  return lines.some((line) => line.every((i) => marked.has(i)));
+}
+
+function loadBingoState() {
+  try {
+    const raw = localStorage.getItem(BINGO_LS_KEY);
+    if (!raw) return null;
+    const s = JSON.parse(raw);
+    if (!s.card || s.card.length !== BINGO_CELLS) return null;
+    return s;
+  } catch {
+    return null;
+  }
+}
+
+function saveBingoState(s) {
+  try {
+    localStorage.setItem(BINGO_LS_KEY, JSON.stringify(s));
+  } catch {}
+}
+
+function BingoView() {
+  const [squares, setSquares] = useState(BINGO_FALLBACK);
+  const [card, setCard] = useState(null);       // array of 25 strings
+  const [marked, setMarked] = useState(null);   // Set of indices
+  const [prev, setPrev] = useState(null);       // {card, marked} — undo buffer
+  const [hasBingo, setHasBingo] = useState(false);
+
+  // Load bingo.json, fall back to hardcoded list
+  useEffect(() => {
+    fetch("bingo.json", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((d) => { if (Array.isArray(d.squares) && d.squares.length >= BINGO_CELLS - 1) setSquares(d.squares); })
+      .catch(() => {});
+  }, []);
+
+  // Restore saved card on mount
+  useEffect(() => {
+    const saved = loadBingoState();
+    if (saved) {
+      setCard(saved.card);
+      const m = new Set(saved.marked || []);
+      m.add(FREE_INDEX);
+      setMarked(m);
+      setHasBingo(checkBingo(m));
+    } else {
+      newCard(squares, false);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function newCard(sq, saveUndo = true) {
+    const src = sq || squares;
+    if (saveUndo && card) setPrev({ card, marked: [...(marked || [])] });
+    const c = makeBingoCard(src);
+    const m = new Set([FREE_INDEX]);
+    setCard(c);
+    setMarked(m);
+    setHasBingo(false);
+    saveBingoState({ card: c, marked: [FREE_INDEX] });
+  }
+
+  function toggleCell(i) {
+    if (i === FREE_INDEX) return; // FREE is always marked
+    setMarked((prev) => {
+      const next = new Set(prev);
+      if (next.has(i)) next.delete(i); else next.add(i);
+      const bingo = checkBingo(next);
+      setHasBingo(bingo);
+      saveBingoState({ card, marked: [...next] });
+      return next;
+    });
+  }
+
+  function undoNewCard() {
+    if (!prev) return;
+    const m = new Set(prev.marked);
+    m.add(FREE_INDEX);
+    setCard(prev.card);
+    setMarked(m);
+    setHasBingo(checkBingo(m));
+    saveBingoState({ card: prev.card, marked: [...m] });
+    setPrev(null);
+  }
+
+  if (!card || !marked) return null;
+
+  const cellSize = Math.min(Math.floor((Math.min(window.innerWidth, 560) - 32) / BINGO_SIZE), 100);
+
+  return (
+    <div className="flex flex-col gap-3">
+
+      {/* Bingo banner */}
+      {hasBingo && (
+        <div style={{
+          background: T.gold, color: T.inkDark || T.greenDark, borderRadius: 14,
+          padding: "14px 16px", textAlign: "center", fontWeight: 900, fontSize: 28,
+          letterSpacing: 2,
+        }}>
+          🎉 BINGO! 🎉
+        </div>
+      )}
+
+      {/* Card */}
+      <Card style={{ padding: 8, overflowX: "auto" }}>
+        {/* Column headers */}
+        <div style={{ display: "grid", gridTemplateColumns: `repeat(${BINGO_SIZE}, ${cellSize}px)`, gap: 4, margin: "0 auto", width: "fit-content" }}>
+          {"BINGO".split("").map((l) => (
+            <div key={l} style={{
+              width: cellSize, textAlign: "center", fontWeight: 900, fontSize: 18,
+              color: T.green, letterSpacing: 1, paddingBottom: 2,
+            }}>{l}</div>
+          ))}
+
+          {/* Cells */}
+          {card.map((text, i) => {
+            const isFree = i === FREE_INDEX;
+            const isMarked = marked.has(i);
+            return (
+              <button
+                key={i}
+                onClick={() => toggleCell(i)}
+                style={{
+                  width: cellSize, height: cellSize,
+                  borderRadius: 8,
+                  border: `2px solid ${isMarked ? T.green : T.line}`,
+                  background: isFree ? T.green : isMarked ? T.soft : T.card,
+                  color: isFree ? "#fff" : isMarked ? T.green : T.ink,
+                  fontSize: isFree ? 13 : Math.max(8, Math.min(11, cellSize / 7)),
+                  fontWeight: isFree ? 900 : isMarked ? 700 : 500,
+                  padding: 3,
+                  lineHeight: 1.2,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  textAlign: "center",
+                  cursor: isFree ? "default" : "pointer",
+                  position: "relative",
+                  transition: "background 0.15s, border-color 0.15s",
+                  wordBreak: "break-word",
+                  hyphens: "auto",
+                }}
+>
+                {text}
+                {isMarked && !isFree && (
+  <span style={{
+    position: "absolute",
+    fontSize: cellSize * 0.45,
+    opacity: 0.6,
+    pointerEvents: "none",
+    lineHeight: 1,
+  }}>
+    ⚽
+  </span>
+)}
+              </button>
+            );
+          })}
+        </div>
+      </Card>
+
+      {/* Controls */}
+      <div className="flex gap-2">
+        <button
+          onClick={() => newCard(squares, true)}
+          style={{ ...btn(), flex: 2 }}
+        >
+          New card
+        </button>
+        {prev && (
+          <button
+            onClick={undoNewCard}
+            style={{ ...btn(true), flex: 1 }}
+          >
+            Undo
+          </button>
+        )}
+      </div>
+
+      {/* How to play */}
+      <Card style={{ padding: 12 }}>
+        <div style={{ fontSize: 13, color: T.sub, lineHeight: 1.5 }}>
+          <b style={{ color: T.ink }}>How to play</b><br />
+          Tap a square when you spot it happening during the match.
+          Tap again to unmark. Get five in a row — across, down, or
+          diagonal — to win. The centre square is a free space.{" "}
+          <b>New card</b> deals a fresh random card (you can undo it
+          if you tap by accident). Add more squares by editing{" "}
+          <span style={{ fontFamily: MONO }}>bingo.json</span> in the repo.
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+// =====================================================================
+// END BINGO BLOCK
+// =====================================================================
+
 function App() {
   const [state, setStateRaw] = useState(null);   // players, locked, me, demo, matches(manual), advanced(manual)
   const [live, setLive] = useState({ matches: [], advanced: [] });
@@ -867,6 +1127,7 @@ function App() {
     ["teams", "Teams", Shield],
     ["matches", "Admin", ClipboardList],
     ["setup", "Picks", Settings],
+    ["bingo", "Bingo", Grid],
   ];
 
   return (
@@ -888,6 +1149,7 @@ function App() {
         {tab === "me" && <PlayerView state={eff} setState={setState} />}
         {tab === "teams" && <TeamsView state={eff} />}
         {tab === "matches" && <MatchesView state={state} setState={setState} />}
+        {tab === "bingo" && <BingoView />}
         {tab === "setup" && (
           <div className="flex flex-col gap-3">
             <SetupView state={state} setState={setState} resetDemo={() => setState({ ...DEMO })} />
