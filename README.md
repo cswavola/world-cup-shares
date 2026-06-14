@@ -4,26 +4,49 @@ A small web app for a World Cup 2026 shares pool. Runs as a static site on
 GitHub Pages, installs to the iPhone home screen, and pulls live results
 automatically.
 
-Based on https://arajantie.github.io/wc2026/
-
 ## Files
 
 | File | What it is | Do you edit it? |
 |------|------------|-----------------|
 | `index.html` | Page shell, loads libraries | rarely |
 | `app.jsx` | The whole app | only to change features |
-| `picks.json` | Who picked which teams | **yes — once, when picks come in** |
+| `picks.json` | Who picked which teams | **yes — edit in the repo** |
+| `results.json` | Optional manual corrections to the live feed | only if the feed is wrong |
 | `manifest.webmanifest`, `icon-*.png` | Home-screen install bits | no |
+
+The app is read-only for your friends — three tabs (Standings, Players, Teams).
+All admin is done in the repo by editing `picks.json` and `results.json`; there
+are no editable controls in the app, and picks can only change via a commit/PR.
+Late entrants can be added any time (optionally with a discounted share count —
+the scoring works with whatever totals you give each player).
 
 ## How results work
 
 On load the app fetches the public-domain
 [openfootball](https://github.com/openfootball/worldcup.json) schedule+scores
-file and computes everyone's points. If that fetch fails (offline, feed down),
+file and computes everyone's points automatically — group results, "reached the
+knockouts" (+1), and knockout rounds. If that fetch fails (offline, feed down),
 it falls back to the schedule embedded in `app.jsx`, so the app always renders.
-Group results, "reached the knockouts" (+1), and knockout rounds are all
-derived automatically — no data entry. The **Admin** tab is a manual override,
-stored only on your device, for the rare case the feed is wrong or slow.
+
+If the feed is ever wrong or slow, correct it from your PC by adding entries to
+`results.json` and committing — your correction overrides the feed for everyone.
+Format:
+
+```json
+{
+  "matches": [
+    { "stage": "group", "a": "ESP", "b": "URU", "outcome": "a" }
+  ],
+  "advanced": ["ESP", "NOR"]
+}
+```
+
+`stage` is one of `group`, `r32`, `r16`, `qf`, `sf`, `third`, `final`.
+`outcome` is `"a"` (team a won), `"b"` (team b won), or `"draw"` (group only).
+`a`/`b` are the three-letter codes used in the app. `advanced` lists teams that
+reached the knockouts (each worth +1); the feed fills this in automatically once
+the Round of 32 is set, so you rarely need it. Leave the arrays empty when there's
+nothing to correct.
 
 ## Scoring rules
 
@@ -40,13 +63,20 @@ shares ÷ total shares held in that team across all players.
 3. Wait ~1 minute. Your site is at
    `https://cswavola.github.io/world-cup-shares/`.
 
-## Set the real picks
+## Set the picks
 
-1. Open the site, go to the **Picks** tab, enter everyone's teams.
-2. Tap **Export picks.json**, commit the downloaded file to the repo
-   (replacing the starter one).
-3. At kickoff of the first match, set `"locked": true` in `picks.json`
-   (or use the lock button, then re-export). Locked = no edits, per the rules.
+Edit `picks.json` in the repo: list each player with their team codes and share
+counts. Most players get 10 shares (max 4 in one team); late entrants can be
+given fewer as a discount. Commit it — that file is what everyone loads, and
+the only way to change picks is another commit.
+
+```json
+{
+  "players": [
+    { "name": "Lauren", "shares": { "ESP": 2, "ENG": 2, "ARG": 2, "BRA": 1, "POR": 1, "GER": 1, "NED": 1 } }
+  ]
+}
+```
 
 ## Editing the app later
 

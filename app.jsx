@@ -63,13 +63,8 @@ const Svg = (p) => (
 );
 const Trophy = (p) => <Svg {...p}><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" /><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" /><path d="M4 22h16" /><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" /><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" /><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" /></Svg>;
 const Shield = (p) => <Svg {...p}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z" /></Svg>;
-const ClipboardList = (p) => <Svg {...p}><rect width="8" height="4" x="8" y="2" rx="1" /><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /><path d="M12 11h4" /><path d="M12 16h4" /><path d="M8 11h.01" /><path d="M8 16h.01" /></Svg>;
-const Settings = (p) => <Svg {...p}><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z" /><circle cx="12" cy="12" r="3" /></Svg>;
 const ChevronDown = (p) => <Svg {...p}><path d="m6 9 6 6 6-6" /></Svg>;
 const ChevronUp = (p) => <Svg {...p}><path d="m18 15-6-6-6 6" /></Svg>;
-const Plus = (p) => <Svg {...p}><path d="M5 12h14" /><path d="M12 5v14" /></Svg>;
-const Minus = (p) => <Svg {...p}><path d="M5 12h14" /></Svg>;
-const X = (p) => <Svg {...p}><path d="M18 6 6 18" /><path d="m6 6 12 12" /></Svg>;
 const User = (p) => <Svg {...p}><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></Svg>;
 const Grid = (p) => <Svg {...p}><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></Svg>;
 
@@ -192,7 +187,6 @@ const PLAYER_COLORS = ["#1F6B4A","#E8A02E","#3E6FB0","#C84B3C","#7A5BA6","#2E8F8
 
 const DEMO = {
   demo: true,
-  locked: false,
   me: null,
   players: [
     { id: "p1", name: "Ada", shares: { ESP: 3, ARG: 3, MAR: 2, JPN: 2 } },
@@ -517,218 +511,6 @@ function TeamsView({ state }) {
   );
 }
 
-function MatchesView({ state, setState }) {
-  const [stage, setStage] = useState("group");
-  const [a, setA] = useState("");
-  const [b, setB] = useState("");
-  const sel = { width: "100%", padding: 10, borderRadius: 10, border: `1px solid ${T.line}`, background: T.card, fontSize: 14, color: T.ink };
-
-  const addMatch = (outcome) => {
-    if (!a || !b || a === b) return;
-    setState((s) => ({ ...s, matches: [{ id: "m" + Date.now(), stage, a, b, outcome }, ...s.matches] }));
-    setA(""); setB("");
-  };
-  const removeMatch = (id) => setState((s) => ({ ...s, matches: s.matches.filter((m) => m.id !== id) }));
-  const toggleAdv = (code) =>
-    setState((s) => ({ ...s, advanced: s.advanced.includes(code) ? s.advanced.filter((c) => c !== code) : [...s.advanced, code] }));
-
-  const outcomeText = (m) =>
-    m.outcome === "draw" ? `${TEAM[m.a].name} drew ${TEAM[m.b].name}`
-      : m.outcome === "a" ? `${TEAM[m.a].name} beat ${TEAM[m.b].name}`
-      : `${TEAM[m.b].name} beat ${TEAM[m.a].name}`;
-
-  return (
-    <div className="flex flex-col gap-4">
-      <Card style={{ padding: 12, background: T.soft }}>
-        <div style={{ fontSize: 13 }}>
-          <b>In the deployed app this tab fills itself in</b> from a live results
-          feed — no typing. The form below stays as an admin override (and for
-          testing the scoring here in the prototype).
-        </div>
-      </Card>
-      <Card style={{ padding: 12 }}>
-        <div style={{ fontWeight: 700, marginBottom: 8 }}>Enter a result (admin override)</div>
-        <div className="flex flex-col gap-2">
-          <select style={sel} value={stage} onChange={(e) => setStage(e.target.value)}>
-            {STAGES.map((s) => <option key={s.id} value={s.id}>{s.label} (win {s.win}{s.draw ? `, draw ${s.draw}` : ""})</option>)}
-          </select>
-          <div className="flex gap-2">
-            <select style={sel} value={a} onChange={(e) => setA(e.target.value)}>
-              <option value="">Team A…</option>
-              {TEAMS.map((t) => <option key={t.code} value={t.code}>{t.name}</option>)}
-            </select>
-            <select style={sel} value={b} onChange={(e) => setB(e.target.value)}>
-              <option value="">Team B…</option>
-              {TEAMS.map((t) => <option key={t.code} value={t.code}>{t.name}</option>)}
-            </select>
-          </div>
-          <div className="flex gap-2">
-            <button onClick={() => addMatch("a")} style={btn()}>A wins</button>
-            {stage === "group" && <button onClick={() => addMatch("draw")} style={btn(true)}>Draw</button>}
-            <button onClick={() => addMatch("b")} style={btn()}>B wins</button>
-          </div>
-        </div>
-      </Card>
-
-      <Card style={{ padding: 12 }}>
-        <div style={{ fontWeight: 700, marginBottom: 2 }}>Reached the knockouts (+1 pt)</div>
-        <div style={{ fontSize: 12, color: T.sub, marginBottom: 8 }}>Tap teams as they qualify for the round of 32.</div>
-        <div className="flex flex-wrap gap-1">
-          {TEAMS.map((t) => {
-            const on = state.advanced.includes(t.code);
-            return (
-              <button key={t.code} onClick={() => toggleAdv(t.code)}
-                style={{ padding: "5px 9px", borderRadius: 999, fontSize: 12, fontFamily: MONO,
-                  border: `1px solid ${on ? T.green : T.line}`,
-                  background: on ? T.green : T.card, color: on ? "#fff" : T.sub }}>
-                {t.code}
-              </button>
-            );
-          })}
-        </div>
-      </Card>
-
-      <div>
-        <div style={{ fontSize: 11, letterSpacing: 2, color: T.sub, fontWeight: 700, margin: "0 4px 6px" }}>
-          RESULTS ({state.matches.length})
-        </div>
-        <Card>
-          {state.matches.length === 0 && (
-            <div style={{ padding: 16, color: T.sub, fontSize: 14 }}>No results yet — enter the first one above.</div>
-          )}
-          {state.matches.map((m, i) => (
-            <div key={m.id} className="flex items-center gap-2"
-              style={{ padding: "10px 12px", borderTop: i ? `1px solid ${T.line}` : "none" }}>
-              <span style={{ fontSize: 14, flex: 1 }}>{outcomeText(m)}</span>
-              <span style={{ fontSize: 11, color: T.sub, fontFamily: MONO }}>{STAGE[m.stage].label}</span>
-              <button onClick={() => removeMatch(m.id)} aria-label="Remove result"><X size={14} color={T.sub} /></button>
-            </div>
-          ))}
-        </Card>
-      </div>
-    </div>
-  );
-}
-
-const btn = (outline) => ({
-  flex: 1, padding: 10, borderRadius: 10, fontWeight: 700, fontSize: 14,
-  background: outline ? T.card : T.green, color: outline ? T.green : "#fff",
-  border: `1px solid ${T.green}`,
-});
-
-function SetupView({ state, setState, resetDemo }) {
-  const [newName, setNewName] = useState("");
-  const setShares = (pid, code, delta) =>
-    setState((s) => ({
-      ...s,
-      players: s.players.map((p) => {
-        if (p.id !== pid) return p;
-        const cur = p.shares[code] || 0;
-        const next = Math.max(0, Math.min(4, cur + delta)); // max 4 per team
-        const used = Object.values(p.shares).reduce((x, y) => x + y, 0) - cur;
-        const capped = Math.min(next, 10 - used); // 10 shares total
-        const shares = { ...p.shares, [code]: capped };
-        if (!capped) delete shares[code];
-        return { ...p, shares };
-      }),
-    }));
-
-  return (
-    <div className="flex flex-col gap-3">
-      {state.demo && (
-        <Card style={{ padding: 12, background: "#FBF3E2", borderColor: T.gold }}>
-          <div style={{ fontSize: 13 }}>
-            <b>Demo data loaded.</b> Replace these players and results with your real ones, or keep poking around.
-          </div>
-        </Card>
-      )}
-      <Card style={{ padding: 12 }}>
-        <div className="flex items-center gap-2">
-          <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 700, fontSize: 14 }}>
-              {state.locked ? "Picks are locked" : "Picks are open"}
-            </div>
-            <div style={{ fontSize: 12, color: T.sub }}>
-              {state.locked
-                ? "Per the rules, no changes after kickoff."
-                : "Lock at kickoff of the first match."}
-            </div>
-          </div>
-          <button onClick={() => setState((s) => ({ ...s, locked: !s.locked }))}
-            style={{ ...btn(state.locked), flex: "none", padding: "8px 14px", fontSize: 13 }}>
-            {state.locked ? "Unlock (admin)" : "Lock picks"}
-          </button>
-        </div>
-      </Card>
-      {state.players.map((p, i) => {
-        const used = Object.values(p.shares).reduce((x, y) => x + y, 0);
-        return (
-          <Card key={p.id} style={{ padding: 12 }}>
-            <div className="flex items-center gap-2" style={{ marginBottom: 8 }}>
-              <span style={{ width: 10, height: 10, borderRadius: 5, background: PLAYER_COLORS[i % 10] }} />
-              <span style={{ fontWeight: 700, flex: 1 }}>{p.name}</span>
-              <span style={{ fontFamily: MONO, fontSize: 12, color: used === 10 ? T.green : "#C84B3C", fontWeight: 700 }}>
-                {used}/10 shares
-              </span>
-              {!state.locked && (
-                <button aria-label={`Remove ${p.name}`}
-                  onClick={() => setState((s) => ({ ...s, players: s.players.filter((x) => x.id !== p.id) }))}>
-                  <X size={14} color={T.sub} />
-                </button>
-              )}
-            </div>
-            <div className="flex flex-col gap-1">
-              {Object.entries(p.shares).map(([code, n]) => (
-                <div key={code} className="flex items-center gap-2" style={{ fontSize: 14 }}>
-                  <span style={{ flex: 1 }}>{TEAM[code].name}</span>
-                  {!state.locked && <button onClick={() => setShares(p.id, code, -1)} style={stepBtn} aria-label="One fewer share"><Minus size={13} /></button>}
-                  <span style={{ fontFamily: MONO, width: 24, textAlign: "center", fontWeight: 700 }}>{state.locked ? `×${n}` : n}</span>
-                  {!state.locked && <button onClick={() => setShares(p.id, code, 1)} style={stepBtn} aria-label="One more share"><Plus size={13} /></button>}
-                </div>
-              ))}
-              {!state.locked && (
-                <select
-                  style={{ marginTop: 4, padding: 8, borderRadius: 10, border: `1px dashed ${T.line}`, background: T.bg, fontSize: 13, color: T.sub }}
-                  value="" onChange={(e) => e.target.value && setShares(p.id, e.target.value, 1)}>
-                  <option value="">+ Add a team…</option>
-                  {TEAMS.filter((t) => !p.shares[t.code]).map((t) => (
-                    <option key={t.code} value={t.code}>{t.name} (Group {t.group}, FIFA {t.rank})</option>
-                  ))}
-                </select>
-              )}
-            </div>
-          </Card>
-        );
-      })}
-      {!state.locked && (
-      <Card style={{ padding: 12 }}>
-        <div className="flex gap-2">
-          <input
-            style={{ flex: 1, padding: 10, borderRadius: 10, border: `1px solid ${T.line}`, fontSize: 14 }}
-            placeholder="New player name" value={newName} onChange={(e) => setNewName(e.target.value)} />
-          <button style={{ ...btn(), flex: "none", padding: "10px 16px" }}
-            onClick={() => {
-              if (!newName.trim()) return;
-              setState((s) => ({ ...s, players: [...s.players, { id: "p" + Date.now(), name: newName.trim(), shares: {} }] }));
-              setNewName("");
-            }}>
-            Add
-          </button>
-        </div>
-      </Card>
-      )}
-      <button onClick={resetDemo} style={{ padding: 10, fontSize: 13, color: T.sub, textDecoration: "underline" }}>
-        Reset to demo data
-      </button>
-    </div>
-  );
-}
-
-const stepBtn = {
-  width: 26, height: 26, borderRadius: 8, border: `1px solid ${T.line}`,
-  display: "flex", alignItems: "center", justifyContent: "center", background: T.card, color: T.ink,
-};
-
 
 /* ---------- live results feed (with embedded fallback) ---------- */
 
@@ -778,45 +560,27 @@ function parseFeed(data) {
   return { matches, advanced: [...advanced] };
 }
 
-// Merge live results with the admin's manual overrides (manual wins on conflict).
-function mergeResults(live, manual, manualAdv) {
+// Merge the live feed with an optional results.json override committed from a PC.
+// The override always wins, so the admin can correct anything the feed gets wrong.
+function mergeResults(live, override) {
   const key = (m) => `${m.stage}:${[m.a, m.b].sort().join("-")}`;
   const byKey = new Map();
   for (const m of live.matches) byKey.set(key(m), m);
-  for (const m of manual) byKey.set(key(m), m);   // override
+  for (const m of (override.matches || [])) byKey.set(key(m), m);
   return {
     matches: [...byKey.values()],
-    advanced: [...new Set([...live.advanced, ...(manualAdv || [])])],
+    advanced: [...new Set([...live.advanced, ...(override.advanced || [])])],
   };
 }
 
 /* ---------- app shell ---------- */
 
-const LS_KEY = "wc26-local-v1";          // device-local: manual overrides, selected player, draft picks
+const LS_KEY = "wc26-local-v1";          // device-local: just the selected player on the Players tab
 const loadLocal = () => {
   try { return JSON.parse(localStorage.getItem(LS_KEY)) || {}; } catch { return {}; }
 };
 const saveLocal = (o) => { try { localStorage.setItem(LS_KEY, JSON.stringify(o)); } catch {} };
 
-function ExportButton({ state }) {
-  const onClick = () => {
-    const payload = JSON.stringify(
-      { locked: state.locked, players: state.players.map((p) => ({ name: p.name, shares: p.shares })) },
-      null, 2
-    );
-    const blob = new Blob([payload], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = "picks.json"; a.click();
-    URL.revokeObjectURL(url);
-  };
-  return (
-    <button onClick={onClick}
-      style={{ padding: 12, borderRadius: 10, fontWeight: 700, fontSize: 14, background: T.greenDark, color: "#fff", width: "100%" }}>
-      Export picks.json
-    </button>
-  );
-}
 
 // =====================================================================
 // BINGO — paste this block into app.jsx, just before the App() function
@@ -1076,16 +840,15 @@ function BingoView() {
 // =====================================================================
 
 function App() {
-  const [state, setStateRaw] = useState(null);   // players, locked, me, demo, matches(manual), advanced(manual)
+  const [state, setStateRaw] = useState(null);   // players, demo, me
   const [live, setLive] = useState({ matches: [], advanced: [] });
+  const [override, setOverride] = useState({ matches: [], advanced: [] });
   const [feed, setFeed] = useState("loading");    // loading | live | fallback
   const [tab, setTab] = useState("board");
 
-  // 1) boot from local draft (or demo), 2) let picks.json override players/locked, 3) pull live results
+  // 1) boot from demo, 2) picks.json sets the roster, 3) live feed, 4) optional results.json override
   useEffect(() => {
-    const local = loadLocal();
-    let initial = { ...DEMO, ...local };
-    setStateRaw(initial);
+    setStateRaw({ ...DEMO, me: loadLocal().me || null });
 
     fetch("picks.json", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : Promise.reject()))
@@ -1094,7 +857,6 @@ function App() {
         setStateRaw((s) => ({
           ...s,
           demo: false,
-          locked: p.locked ?? s.locked,
           players: p.players.map((pl, i) => ({ id: "p" + i, name: pl.name, shares: pl.shares || {} })),
         }));
       })
@@ -1104,20 +866,27 @@ function App() {
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((data) => { setLive(parseFeed(data)); setFeed("live"); })
       .catch(() => { setFeed("fallback"); });
+
+    // optional admin override, committed from a PC; absent by default
+    fetch("results.json", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((o) => { if (o) setOverride({ matches: o.matches || [], advanced: o.advanced || [] }); })
+      .catch(() => {});
   }, []);
 
+  // only the selected player is remembered on the device
   const setState = (fn) =>
     setStateRaw((prev) => {
       const next = typeof fn === "function" ? fn(prev) : fn;
-      saveLocal({ me: next.me, locked: next.locked, players: next.players, matches: next.matches, advanced: next.advanced, demo: next.demo });
+      saveLocal({ me: next.me });
       return next;
     });
 
   if (!state)
     return <div style={{ minHeight: "100vh", background: T.bg, display: "flex", alignItems: "center", justifyContent: "center", color: T.sub }}>Loading…</div>;
 
-  // effective results = live feed + manual overrides; this is what the read-only views score against
-  const merged = mergeResults(live, state.matches || [], state.advanced || []);
+  // effective results = live feed + committed override; this is what every view scores against
+  const merged = mergeResults(live, override);
   const eff = { ...state, matches: merged.matches, advanced: merged.advanced };
 
   const distributed = Object.values(teamPoints(eff)).reduce((a, b) => a + b, 0);
@@ -1125,8 +894,6 @@ function App() {
     ["board", "Standings", Trophy],
     ["me", "Players", User],
     ["teams", "Teams", Shield],
-    ["matches", "Admin", ClipboardList],
-    ["setup", "Picks", Settings],
     ["bingo", "Bingo", Grid],
   ];
 
@@ -1137,7 +904,7 @@ function App() {
           WC26 <span style={{ color: T.gold }}>SHARES</span>
         </div>
         <div style={{ fontSize: 12, opacity: 0.85, fontFamily: MONO, marginTop: 2 }}>
-          10 shares · max 4 per team · {fmt(distributed)} pts distributed
+          {state.players.length} players · max 4 shares per team · {fmt(distributed)} pts distributed
           <span style={{ marginLeft: 8, opacity: 0.7 }}>
             {feed === "live" ? "· live ✓" : feed === "fallback" ? "· offline (schedule only)" : "· syncing…"}
           </span>
@@ -1148,18 +915,7 @@ function App() {
         {tab === "board" && <Leaderboard state={eff} />}
         {tab === "me" && <PlayerView state={eff} setState={setState} />}
         {tab === "teams" && <TeamsView state={eff} />}
-        {tab === "matches" && <MatchesView state={state} setState={setState} />}
         {tab === "bingo" && <BingoView />}
-        {tab === "setup" && (
-          <div className="flex flex-col gap-3">
-            <SetupView state={state} setState={setState} resetDemo={() => setState({ ...DEMO })} />
-            <ExportButton state={state} />
-            <div style={{ fontSize: 12, color: T.sub, padding: "0 4px" }}>
-              Build everyone's picks here, tap <b>Export picks.json</b>, then commit that file to your repo.
-              Whatever is in picks.json is what your friends load.
-            </div>
-          </div>
-        )}
       </main>
 
       <nav style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: T.card, borderTop: `1px solid ${T.line}`, display: "flex", paddingBottom: "env(safe-area-inset-bottom)" }}>
