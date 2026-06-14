@@ -6,7 +6,8 @@
    only if the live feed is ever wrong, the in-app admin override.
    ===================================================================== */
 
-const { useState, useEffect, useMemo } = React;
+// const { useState, useEffect, useMemo } = React;
+const { useState, useEffect, useMemo, useRef } = React;
 
 
 /* ---- charts, drawn in plain SVG (no chart library) ---- */
@@ -67,7 +68,7 @@ const ChevronDown = (p) => <Svg {...p}><path d="m6 9 6 6 6-6" /></Svg>;
 const ChevronUp = (p) => <Svg {...p}><path d="m18 15-6-6-6 6" /></Svg>;
 const User = (p) => <Svg {...p}><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></Svg>;
 const Grid = (p) => <Svg {...p}><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></Svg>;
-
+const Calendar = (p) => <Svg {...p}><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></Svg>;
 
 const T = {
   bg: "#F4F6F1", ink: "#16251D", sub: "#5C6B61", green: "#1F6B4A",
@@ -555,7 +556,8 @@ function parseFeed(data) {
       if (x === y) continue;                       // still undecided
       outcome = x > y ? "a" : "b";
     }
-    matches.push({ id: m.date + a + b, date: m.date, stage, a, b, outcome });
+    // matches.push({ id: m.date + a + b, date: m.date, stage, a, b, outcome });
+    matches.push({ id: m.date + a + b, date: m.date, stage, a, b, outcome, score: sc.ft });
   }
   return { matches, advanced: [...advanced] };
 }
@@ -845,6 +847,153 @@ function BingoView() {
 // END BINGO BLOCK
 // =====================================================================
 
+
+// =====================================================================
+// FIXTURES — paste this block into app.jsx, just before the App() function
+// (after the BingoView block)
+// =====================================================================
+
+function FixturesView({ state }) {
+  const todayRef = useRef(null);
+
+  useEffect(() => {
+    if (todayRef.current) {
+      todayRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, []);
+
+  const today = new Date().toISOString().slice(0, 10);
+
+  const resultByKey = {};
+  for (const m of state.matches) {
+    const key = [m.a, m.b].sort().join("-");
+    resultByKey[key] = m;
+  }
+
+  const byDate = {};
+  for (const f of FIXTURES) {
+    if (!byDate[f.date]) byDate[f.date] = [];
+    byDate[f.date].push(f);
+  }
+  const dates = Object.keys(byDate).sort();
+
+  const fmtDate = (d) =>
+    new Date(d + "T12:00:00").toLocaleDateString(undefined, {
+      weekday: "long", day: "numeric", month: "long"
+    });
+
+  const firstFutureDate = dates.find((d) => d >= today);
+
+  const scrollToToday = () => {
+    if (todayRef.current) {
+      todayRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-4">
+
+      {/* Back to today button — fixed above the nav bar */}
+      <button
+        onClick={scrollToToday}
+        style={{
+          position: "fixed", bottom: 84, right: 16, zIndex: 10,
+          background: T.green, color: "#fff",
+          border: "none", borderRadius: 999,
+          padding: "8px 14px", fontSize: 12, fontWeight: 700,
+          boxShadow: "0 2px 8px rgba(0,0,0,0.18)",
+        }}
+      >
+        Today
+      </button>
+
+      {dates.map((date) => {
+        const fixtures = byDate[date];
+        const isPast = date < today;
+        const isToday = date === today;
+
+        return (
+          <div key={date}>
+            {date === firstFutureDate && (
+              <div ref={todayRef} style={{
+                display: "flex", alignItems: "center", gap: 8,
+                margin: "4px 0 8px",
+              }}>
+                <div style={{ flex: 1, height: 1, background: T.green }} />
+                <span style={{
+                  fontSize: 11, fontWeight: 700, letterSpacing: 2,
+                  color: T.green, whiteSpace: "nowrap",
+                }}>
+                  {isToday ? "TODAY" : "UPCOMING"}
+                </span>
+                <div style={{ flex: 1, height: 1, background: T.green }} />
+              </div>
+            )}
+
+            <div style={{
+              fontSize: 11, letterSpacing: 2, fontWeight: 700,
+              color: isPast ? T.sub : T.ink,
+              margin: "0 4px 6px",
+            }}>
+              {fmtDate(date).toUpperCase()}
+            </div>
+
+            <Card style={{ opacity: isPast ? 0.8 : 1 }}>
+              {fixtures.map((f, i) => {
+                const key = [f.a, f.b].sort().join("-");
+                const match = resultByKey[key];
+                const winnerCode = match
+                  ? (match.outcome === "a" ? f.a : match.outcome === "b" ? f.b : null)
+                  : null;
+                const scoreStr = match && match.score
+                  ? `${match.score[0]}–${match.score[1]}`
+                  : null;
+
+                return (
+                  <div key={i} style={{
+                    padding: "10px 12px",
+                    borderTop: i ? `1px solid ${T.line}` : "none",
+                  }}>
+                    <div className="flex items-center gap-2">
+                      <span style={{ flex: 1, fontSize: 14 }}>
+                        <b style={{ color: winnerCode === f.a ? T.green : T.ink }}>
+                          {TEAM[f.a].name}
+                        </b>
+                        <span style={{ color: T.sub }}> v </span>
+                        <b style={{ color: winnerCode === f.b ? T.green : T.ink }}>
+                          {TEAM[f.b].name}
+                        </b>
+                      </span>
+                      <span style={{
+                        fontFamily: MONO, fontSize: 12,
+                        color: match ? (match.outcome === "draw" ? T.sub : T.green) : T.sub,
+                        fontWeight: match ? 700 : 400,
+                      }}>
+                        {scoreStr || (match ? "Draw" : f.time.split("-")[0])}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 11, color: T.sub, marginTop: 2 }}>
+                      {match
+                        ? (winnerCode
+                            ? `${TEAM[winnerCode].name} won · ${f.city}`
+                            : `Draw · ${f.city}`)
+                        : f.city}
+                    </div>
+                  </div>
+                );
+              })}
+            </Card>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// =====================================================================
+// END FIXTURES BLOCK
+// =====================================================================
+
 function App() {
   const [state, setStateRaw] = useState(null);   // players, demo, me
   const [live, setLive] = useState({ matches: [], advanced: [] });
@@ -901,6 +1050,7 @@ function App() {
     ["me", "Players", User],
     ["teams", "Teams", Shield],
     ["bingo", "Bingo", Grid],
+    ["fixtures", "Fixtures", Calendar],
   ];
 
   return (
@@ -922,6 +1072,7 @@ function App() {
         {tab === "me" && <PlayerView state={eff} setState={setState} />}
         {tab === "teams" && <TeamsView state={eff} />}
         {tab === "bingo" && <BingoView />}
+        {tab === "fixtures" && <FixturesView state={eff} />}
       </main>
 
       <nav style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: T.card, borderTop: `1px solid ${T.line}`, display: "flex", paddingBottom: "env(safe-area-inset-bottom)" }}>
