@@ -30,8 +30,6 @@
   <!-- Libraries from CDN (loaded on your friends' phones, not bundled) -->
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <script crossorigin src="https://unpkg.com/react-is@18/umd/react-is.production.min.js"></script>
-  <script crossorigin src="https://unpkg.com/recharts@2/umd/Recharts.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </head>
 <body>
@@ -55,7 +53,6 @@
       var miss = [];
       if (!window.React) miss.push("React");
       if (!window.ReactDOM) miss.push("ReactDOM");
-      if (!window.Recharts) miss.push("Recharts");
       if (!window.Babel) miss.push("Babel");
       if (miss.length) showError("These libraries didn't load (CDN blocked?): " + miss.join(", "));
       // If still on the boot message a few seconds later, app.jsx probably didn't load.

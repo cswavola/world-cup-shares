@@ -7,7 +7,51 @@
    ===================================================================== */
 
 const { useState, useEffect, useMemo } = React;
-const { LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } = Recharts;
+
+/* ---- charts, drawn in plain SVG (no chart library) ---- */
+function RaceChart({ data, players }) {
+  const W = 320, H = 190, P = { l: 26, r: 8, t: 8, b: 16 };
+  const n = data.length;
+  const maxV = Math.max(0.5, ...data.flatMap((d) => players.map((p) => d[p.name] || 0)));
+  const x = (i) => P.l + (n <= 1 ? 0 : (i * (W - P.l - P.r)) / (n - 1));
+  const y = (v) => H - P.b - (v / maxV) * (H - P.t - P.b);
+  const ticks = 4;
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: "block" }}>
+      {Array.from({ length: ticks + 1 }, (_, k) => {
+        const v = (maxV * k) / ticks, yy = y(v);
+        return (
+          <g key={k}>
+            <line x1={P.l} y1={yy} x2={W - P.r} y2={yy} stroke={T.line} strokeWidth="1" />
+            <text x={P.l - 4} y={yy + 3} textAnchor="end" fontSize="7" fill={T.sub} fontFamily={MONO}>{v.toFixed(0)}</text>
+          </g>
+        );
+      })}
+      {players.map((p, i) => (
+        <polyline key={p.id} fill="none" stroke={PLAYER_COLORS[i % 10]} strokeWidth="2"
+          strokeLinejoin="round" strokeLinecap="round"
+          points={data.map((d, idx) => `${x(idx)},${y(d[p.name] || 0)}`).join(" ")} />
+      ))}
+    </svg>
+  );
+}
+
+function DistBars({ rows }) {
+  const max = Math.max(0.01, ...rows.map((r) => r.points));
+  return (
+    <div className="flex flex-col gap-1" style={{ padding: "0 12px" }}>
+      {rows.map((r) => (
+        <div key={r.team} className="flex items-center gap-2" style={{ fontSize: 12 }}>
+          <span style={{ fontFamily: MONO, width: 34, color: T.sub }}>{r.team}</span>
+          <div style={{ flex: 1, background: T.soft, borderRadius: 4, height: 14, overflow: "hidden" }}>
+            <div style={{ width: `${(r.points / max) * 100}%`, background: T.green, height: "100%", borderRadius: 4, minWidth: r.points > 0 ? 2 : 0 }} />
+          </div>
+          <span style={{ fontFamily: MONO, width: 38, textAlign: "right", fontWeight: 700 }}>{fmt(r.points)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 /* ---- tiny inline icons (so we don't depend on an icon library) ---- */
 const Svg = (p) => (
@@ -292,20 +336,17 @@ function Leaderboard({ state }) {
         ))}
       </div>
       {mode === "race" && (
-        <Card style={{ padding: "16px 8px 8px 0" }}>
-          <ResponsiveContainer width="100%" height={280}>
-            <LineChart data={race}>
-              <CartesianGrid stroke={T.line} strokeDasharray="3 3" />
-              <XAxis dataKey="label" tick={{ fontSize: 10, fontFamily: MONO }} stroke={T.sub} />
-              <YAxis tick={{ fontSize: 10, fontFamily: MONO }} stroke={T.sub} width={34} />
-              <Tooltip contentStyle={{ fontSize: 12, borderRadius: 10 }} />
-              {state.players.map((p, i) => (
-                <Line key={p.id} type="monotone" dataKey={p.name} dot={false}
-                  stroke={PLAYER_COLORS[i % 10]} strokeWidth={2} />
-              ))}
-            </LineChart>
-          </ResponsiveContainer>
-          <div style={{ fontSize: 11, color: T.sub, padding: "4px 12px 8px" }}>
+        <Card style={{ padding: "12px 4px 4px" }}>
+          <RaceChart data={race} players={state.players} />
+          <div className="flex flex-wrap gap-2" style={{ padding: "6px 10px" }}>
+            {state.players.map((p, i) => (
+              <span key={p.id} style={{ fontSize: 11, color: T.sub, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                <span style={{ width: 8, height: 8, borderRadius: 4, background: PLAYER_COLORS[i % 10] }} />
+                {p.name}
+              </span>
+            ))}
+          </div>
+          <div style={{ fontSize: 11, color: T.sub, padding: "0 10px 6px" }}>
             Cumulative points after each result.
           </div>
         </Card>
@@ -403,16 +444,9 @@ function PlayerView({ state, setState }) {
         </div>
       </Card>
 
-      <Card style={{ padding: "14px 8px 4px 0" }}>
-        <div style={{ fontWeight: 700, fontSize: 14, padding: "0 0 6px 14px" }}>Where the points come from</div>
-        <ResponsiveContainer width="100%" height={Math.max(120, dist.length * 38)}>
-          <BarChart data={dist} layout="vertical" margin={{ left: 8 }}>
-            <XAxis type="number" tick={{ fontSize: 10, fontFamily: MONO }} stroke={T.sub} />
-            <YAxis type="category" dataKey="team" tick={{ fontSize: 11, fontFamily: MONO }} stroke={T.sub} width={44} />
-            <Tooltip contentStyle={{ fontSize: 12, borderRadius: 10 }} />
-            <Bar dataKey="points" fill={T.green} radius={[0, 6, 6, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
+      <Card style={{ padding: "14px 0 8px" }}>
+        <div style={{ fontWeight: 700, fontSize: 14, padding: "0 0 8px 14px" }}>Where the points come from</div>
+        <DistBars rows={dist} />
       </Card>
 
       <div>
