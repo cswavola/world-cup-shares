@@ -1,4 +1,4 @@
-const { useState, useEffect, useMemo } = React;
+const { useState, useEffect, useMemo, useRef } = React;
 function RaceChart({ data, players }) {
   const W = 320, H = 190, P = { l: 26, r: 8, t: 8, b: 16 };
   const n = data.length;
@@ -46,6 +46,7 @@ const ChevronDown = (p) => /* @__PURE__ */ React.createElement(Svg, { ...p }, /*
 const ChevronUp = (p) => /* @__PURE__ */ React.createElement(Svg, { ...p }, /* @__PURE__ */ React.createElement("path", { d: "m18 15-6-6-6 6" }));
 const User = (p) => /* @__PURE__ */ React.createElement(Svg, { ...p }, /* @__PURE__ */ React.createElement("path", { d: "M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" }), /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "7", r: "4" }));
 const Grid = (p) => /* @__PURE__ */ React.createElement(Svg, { ...p }, /* @__PURE__ */ React.createElement("rect", { x: "3", y: "3", width: "7", height: "7" }), /* @__PURE__ */ React.createElement("rect", { x: "14", y: "3", width: "7", height: "7" }), /* @__PURE__ */ React.createElement("rect", { x: "14", y: "14", width: "7", height: "7" }), /* @__PURE__ */ React.createElement("rect", { x: "3", y: "14", width: "7", height: "7" }));
+const Calendar = (p) => /* @__PURE__ */ React.createElement(Svg, { ...p }, /* @__PURE__ */ React.createElement("rect", { x: "3", y: "4", width: "18", height: "18", rx: "2" }), /* @__PURE__ */ React.createElement("path", { d: "M16 2v4M8 2v4M3 10h18" }));
 const T = {
   bg: "#F4F6F1",
   ink: "#16251D",
@@ -463,7 +464,7 @@ function parseFeed(data) {
       if (x === y) continue;
       outcome = x > y ? "a" : "b";
     }
-    matches.push({ id: m.date + a + b, date: m.date, stage, a, b, outcome });
+    matches.push({ id: m.date + a + b, date: m.date, stage, a, b, outcome, score: sc.ft });
   }
   return { matches, advanced: [...advanced] };
 }
@@ -699,6 +700,94 @@ function BingoView() {
     "Undo"
   )), /* @__PURE__ */ React.createElement(Card, { style: { padding: 12 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: T.sub, lineHeight: 1.5 } }, /* @__PURE__ */ React.createElement("b", { style: { color: T.ink } }, "How to play"), /* @__PURE__ */ React.createElement("br", null), "Tap a square when you spot it happening during the match. Tap again to unmark. Get five in a row \u2014 across, down, or diagonal \u2014 to win. The centre square is a free space.", " ", /* @__PURE__ */ React.createElement("b", null, "New card"), " deals a fresh random card (you can undo it if you tap by accident). Add more squares by editing", " ", /* @__PURE__ */ React.createElement("span", { style: { fontFamily: MONO } }, "bingo.json"), " in the repo.")));
 }
+function FixturesView({ state }) {
+  const todayRef = useRef(null);
+  useEffect(() => {
+    if (todayRef.current) {
+      todayRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, []);
+  const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+  const resultByKey = {};
+  for (const m of state.matches) {
+    const key = [m.a, m.b].sort().join("-");
+    resultByKey[key] = m;
+  }
+  const byDate = {};
+  for (const f of FIXTURES) {
+    if (!byDate[f.date]) byDate[f.date] = [];
+    byDate[f.date].push(f);
+  }
+  const dates = Object.keys(byDate).sort();
+  const fmtDate = (d) => (/* @__PURE__ */ new Date(d + "T12:00:00")).toLocaleDateString(void 0, {
+    weekday: "long",
+    day: "numeric",
+    month: "long"
+  });
+  const firstFutureDate = dates.find((d) => d >= today);
+  const scrollToToday = () => {
+    if (todayRef.current) {
+      todayRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  };
+  return /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-4" }, /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      onClick: scrollToToday,
+      style: {
+        position: "fixed",
+        bottom: 84,
+        right: 16,
+        zIndex: 10,
+        background: T.green,
+        color: "#fff",
+        border: "none",
+        borderRadius: 999,
+        padding: "8px 14px",
+        fontSize: 12,
+        fontWeight: 700,
+        boxShadow: "0 2px 8px rgba(0,0,0,0.18)"
+      }
+    },
+    "Today"
+  ), dates.map((date) => {
+    const fixtures = byDate[date];
+    const isPast = date < today;
+    const isToday = date === today;
+    return /* @__PURE__ */ React.createElement("div", { key: date }, date === firstFutureDate && /* @__PURE__ */ React.createElement("div", { ref: todayRef, style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      margin: "4px 0 8px"
+    } }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1, height: 1, background: T.green } }), /* @__PURE__ */ React.createElement("span", { style: {
+      fontSize: 11,
+      fontWeight: 700,
+      letterSpacing: 2,
+      color: T.green,
+      whiteSpace: "nowrap"
+    } }, isToday ? "TODAY" : "UPCOMING"), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, height: 1, background: T.green } })), /* @__PURE__ */ React.createElement("div", { style: {
+      fontSize: 11,
+      letterSpacing: 2,
+      fontWeight: 700,
+      color: isPast ? T.sub : T.ink,
+      margin: "0 4px 6px"
+    } }, fmtDate(date).toUpperCase()), /* @__PURE__ */ React.createElement(Card, { style: { opacity: isPast ? 0.8 : 1 } }, fixtures.map((f, i) => {
+      const key = [f.a, f.b].sort().join("-");
+      const match = resultByKey[key];
+      const winnerCode = match ? match.outcome === "a" ? f.a : match.outcome === "b" ? f.b : null : null;
+      const scoreStr = match && match.score ? `${match.score[0]}\u2013${match.score[1]}` : null;
+      return /* @__PURE__ */ React.createElement("div", { key: i, style: {
+        padding: "10px 12px",
+        borderTop: i ? `1px solid ${T.line}` : "none"
+      } }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2" }, /* @__PURE__ */ React.createElement("span", { style: { flex: 1, fontSize: 14 } }, /* @__PURE__ */ React.createElement("b", { style: { color: winnerCode === f.a ? T.green : T.ink } }, TEAM[f.a].name), /* @__PURE__ */ React.createElement("span", { style: { color: T.sub } }, " v "), /* @__PURE__ */ React.createElement("b", { style: { color: winnerCode === f.b ? T.green : T.ink } }, TEAM[f.b].name)), /* @__PURE__ */ React.createElement("span", { style: {
+        fontFamily: MONO,
+        fontSize: 12,
+        color: match ? match.outcome === "draw" ? T.sub : T.green : T.sub,
+        fontWeight: match ? 700 : 400
+      } }, scoreStr || (match ? "Draw" : f.time.split("-")[0]))), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: T.sub, marginTop: 2 } }, match ? winnerCode ? `${TEAM[winnerCode].name} won \xB7 ${f.city}` : `Draw \xB7 ${f.city}` : f.city));
+    })));
+  }));
+}
 function App() {
   const [state, setStateRaw] = useState(null);
   const [live, setLive] = useState({ matches: [], advanced: [] });
@@ -741,9 +830,10 @@ function App() {
     ["board", "Standings", Trophy],
     ["me", "Players", User],
     ["teams", "Teams", Shield],
-    ["bingo", "Bingo", Grid]
+    ["bingo", "Bingo", Grid],
+    ["fixtures", "Fixtures", Calendar]
   ];
-  return /* @__PURE__ */ React.createElement("div", { style: { minHeight: "100vh", background: T.bg, color: T.ink, fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" } }, /* @__PURE__ */ React.createElement("header", { style: { background: T.greenDark, color: "#fff", padding: "18px 16px 14px", paddingTop: "calc(18px + env(safe-area-inset-top))" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 24, fontWeight: 900, letterSpacing: -0.5 } }, "WC26 ", /* @__PURE__ */ React.createElement("span", { style: { color: T.gold } }, "SHARES")), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, opacity: 0.85, fontFamily: MONO, marginTop: 2 } }, state.players.length, " players \xB7 max 4 shares per team \xB7 ", fmt(distributed), " pts distributed", /* @__PURE__ */ React.createElement("span", { style: { marginLeft: 8, opacity: 0.7 } }, feed === "live" ? "\xB7 live \u2713" : feed === "fallback" ? "\xB7 offline (schedule only)" : "\xB7 syncing\u2026"))), /* @__PURE__ */ React.createElement("main", { style: { padding: 12, paddingBottom: 84, maxWidth: 560, margin: "0 auto" } }, tab === "board" && /* @__PURE__ */ React.createElement(Leaderboard, { state: eff }), tab === "me" && /* @__PURE__ */ React.createElement(PlayerView, { state: eff, setState }), tab === "teams" && /* @__PURE__ */ React.createElement(TeamsView, { state: eff }), tab === "bingo" && /* @__PURE__ */ React.createElement(BingoView, null)), /* @__PURE__ */ React.createElement("nav", { style: { position: "fixed", bottom: 0, left: 0, right: 0, background: T.card, borderTop: `1px solid ${T.line}`, display: "flex", paddingBottom: "env(safe-area-inset-bottom)" } }, tabs.map(([id, label, Icon]) => /* @__PURE__ */ React.createElement(
+  return /* @__PURE__ */ React.createElement("div", { style: { minHeight: "100vh", background: T.bg, color: T.ink, fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" } }, /* @__PURE__ */ React.createElement("header", { style: { background: T.greenDark, color: "#fff", padding: "18px 16px 14px", paddingTop: "calc(18px + env(safe-area-inset-top))" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 24, fontWeight: 900, letterSpacing: -0.5 } }, "WC26 ", /* @__PURE__ */ React.createElement("span", { style: { color: T.gold } }, "SHARES")), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, opacity: 0.85, fontFamily: MONO, marginTop: 2 } }, state.players.length, " players \xB7 max 4 shares per team \xB7 ", fmt(distributed), " pts distributed", /* @__PURE__ */ React.createElement("span", { style: { marginLeft: 8, opacity: 0.7 } }, feed === "live" ? "\xB7 live \u2713" : feed === "fallback" ? "\xB7 offline (schedule only)" : "\xB7 syncing\u2026"))), /* @__PURE__ */ React.createElement("main", { style: { padding: 12, paddingBottom: 84, maxWidth: 560, margin: "0 auto" } }, tab === "board" && /* @__PURE__ */ React.createElement(Leaderboard, { state: eff }), tab === "me" && /* @__PURE__ */ React.createElement(PlayerView, { state: eff, setState }), tab === "teams" && /* @__PURE__ */ React.createElement(TeamsView, { state: eff }), tab === "bingo" && /* @__PURE__ */ React.createElement(BingoView, null), tab === "fixtures" && /* @__PURE__ */ React.createElement(FixturesView, { state: eff })), /* @__PURE__ */ React.createElement("nav", { style: { position: "fixed", bottom: 0, left: 0, right: 0, background: T.card, borderTop: `1px solid ${T.line}`, display: "flex", paddingBottom: "env(safe-area-inset-bottom)" } }, tabs.map(([id, label, Icon]) => /* @__PURE__ */ React.createElement(
     "button",
     {
       key: id,

@@ -95,7 +95,7 @@ one-step build. It's still local-only — no Mac-specific tooling, just Node.
 
 ```sh
 npm install      # installs esbuild (the only dependency)
-npm run setup    # turns on the pre-commit hook (sets core.hooksPath)
+npm run setup    # installs the pre-commit hook into this clone (.git/hooks)
 ```
 
 **While working on the app:**
