@@ -365,21 +365,23 @@ function ShareBar({ code, players, tot }) {
 
 // Shared ownership detail for one team — same data as TeamsView's ShareBar row.
 // Used in both FixturesView and PlayerView to show who holds shares in a team.
-function TeamOwnershipPanel({ code, state, tp, tot }) {
+function TeamOwnershipPanel({ code, state, tp, tot, showTitle = true }) {
   const owners = state.players
     .map((p, i) => ({ name: p.name, n: p.shares[code] || 0, color: PLAYER_COLORS[i % 10] }))
     .filter((o) => o.n > 0);
 
   return (
     <div>
-      <div style={{ fontSize: 11, fontWeight: 700, color: T.sub, marginBottom: 6, letterSpacing: 1 }}>
-        {TEAM[code].name.toUpperCase()}
-        {tp != null && (
-          <span style={{ fontFamily: MONO, fontWeight: 700, color: tp[code] ? T.green : T.sub, marginLeft: 8 }}>
-            {fmt(tp[code])} pts
-          </span>
-        )}
-      </div>
+      {showTitle && (
+        <div style={{ fontSize: 11, fontWeight: 700, color: T.sub, marginBottom: 6, letterSpacing: 1 }}>
+          {TEAM[code].name.toUpperCase()}
+          {tp != null && (
+            <span style={{ fontFamily: MONO, fontWeight: 700, color: tp[code] ? T.green : T.sub, marginLeft: 8 }}>
+              {fmt(tp[code])} pts
+            </span>
+          )}
+        </div>
+      )}
       <div style={{ marginBottom: 6 }}>
         <ShareBar code={code} players={state.players} tot={tot?.[code]} />
       </div>
@@ -607,12 +609,7 @@ function TeamsView({ state }) {
                     {fmt(tp[t.code])}
                   </span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <div style={{ flex: 1 }}><ShareBar code={t.code} players={state.players} tot={tot[t.code]} /></div>
-                  <span style={{ fontFamily: MONO, fontSize: 11, color: T.sub, width: 50, textAlign: "right" }}>
-                    {tot[t.code] || 0} sh
-                  </span>
-                </div>
+                <TeamOwnershipPanel code={t.code} state={state} tp={tp} tot={tot} showTitle={false} />
               </div>
             ))}
           </Card>
