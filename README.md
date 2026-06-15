@@ -8,8 +8,9 @@ automatically.
 
 | File | What it is | Do you edit it? |
 |------|------------|-----------------|
-| `index.html` | Page shell, loads libraries | rarely |
-| `app.jsx` | The whole app | only to change features |
+| `index.html` | Page shell, loads React + `app.js` | rarely |
+| `app.jsx` | The whole app (source) | only to change features |
+| `app.js` | Built from `app.jsx` — **generated, never edit by hand** | no |
 | `picks.json` | Who picked which teams | **yes — edit in the repo** |
 | `results.json` | Optional manual corrections to the live feed | only if the feed is wrong |
 | `manifest.webmanifest`, `icon-*.png` | Home-screen install bits | no |
@@ -78,9 +79,39 @@ the only way to change picks is another commit.
 }
 ```
 
-## Editing the app later
+## Editing the data (picks & results)
 
-`app.jsx` compiles in the browser, so you can edit it right on github.com and
-the change is live after the commit — no Mac, no build tools. (To preview
-locally you need a local web server, e.g. `python3 -m http.server`, because
-browsers block the in-page compiler on `file://`.)
+`picks.json` and `results.json` are plain data — not compiled — so you can still
+edit them right on github.com and commit, no tools needed. The change is live
+after the commit, and these are the only files most admin ever touches.
+
+## Editing the app (app.jsx)
+
+`app.jsx` is now precompiled to `app.js` by a tiny build (esbuild), instead of
+being compiled in every visitor's browser. So changes to `app.jsx` go through a
+one-step build. It's still local-only — no Mac-specific tooling, just Node.
+
+**First time on a machine:**
+
+```sh
+npm install      # installs esbuild (the only dependency)
+npm run setup    # turns on the pre-commit hook (sets core.hooksPath)
+```
+
+**While working on the app:**
+
+```sh
+npm run dev      # watches app.jsx and rebuilds app.js on every save (~10ms)
+python3 -m http.server   # in another terminal, then open localhost:8000
+```
+
+Edit `app.jsx`, save, refresh — same loop as before, the compile just happens
+locally now. Then commit as normal. The pre-commit hook rebuilds `app.js`,
+validates the JSON files, and stages `app.js` into the commit, so the built file
+always matches the source. If `app.jsx` has a syntax error or a JSON file is
+malformed, the commit is blocked with a message instead of shipping a broken
+site. (Emergency bypass, rarely needed: `git commit --no-verify`.)
+
+`app.js` is committed (Pages serves it directly), but treat it as generated —
+never hand-edit it. To build once without committing, run `npm run build`.
+
