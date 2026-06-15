@@ -609,12 +609,6 @@ function BingoView() {
   const [prev, setPrev] = useState(null);
   const [hasBingo, setHasBingo] = useState(false);
   useEffect(() => {
-    fetch("bingo.json", { cache: "no-store" }).then((r) => r.ok ? r.json() : Promise.reject()).then((d) => {
-      if (Array.isArray(d.squares) && d.squares.length >= BINGO_CELLS - 1) setSquares(d.squares);
-    }).catch(() => {
-    });
-  }, []);
-  useEffect(() => {
     const saved = loadBingoState();
     if (saved) {
       setCard(saved.card);
@@ -622,9 +616,14 @@ function BingoView() {
       m.add(FREE_INDEX);
       setMarked(m);
       setHasBingo(checkBingo(m));
-    } else {
-      newCard(squares, false);
     }
+    fetch("bingo.json", { cache: "no-store" }).then((r) => r.ok ? r.json() : Promise.reject()).then((d) => {
+      const sq = Array.isArray(d.squares) && d.squares.length >= BINGO_CELLS - 1 ? d.squares : BINGO_FALLBACK;
+      setSquares(sq);
+      if (!saved) newCard(sq, false);
+    }).catch(() => {
+      if (!saved) newCard(BINGO_FALLBACK, false);
+    });
   }, []);
   function newCard(sq, saveUndo = true) {
     const src = sq || squares;

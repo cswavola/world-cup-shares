@@ -734,15 +734,9 @@ function BingoView() {
   const [prev, setPrev] = useState(null);       // {card, marked} — undo buffer
   const [hasBingo, setHasBingo] = useState(false);
 
-  // Load bingo.json, fall back to hardcoded list
-  useEffect(() => {
-    fetch("bingo.json", { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : Promise.reject()))
-      .then((d) => { if (Array.isArray(d.squares) && d.squares.length >= BINGO_CELLS - 1) setSquares(d.squares); })
-      .catch(() => {});
-  }, []);
-
-  // Restore saved card on mount
+  // Load bingo.json, then restore saved card or generate a new one.
+  // Card generation is deferred until after the fetch so we always have
+  // the full 24-square list before slicing — BINGO_FALLBACK only has 22.
   useEffect(() => {
     const saved = loadBingoState();
     if (saved) {
@@ -751,9 +745,17 @@ function BingoView() {
       m.add(FREE_INDEX);
       setMarked(m);
       setHasBingo(checkBingo(m));
-    } else {
-      newCard(squares, false);
     }
+    fetch("bingo.json", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((d) => {
+        const sq = Array.isArray(d.squares) && d.squares.length >= BINGO_CELLS - 1 ? d.squares : BINGO_FALLBACK;
+        setSquares(sq);
+        if (!saved) newCard(sq, false);
+      })
+      .catch(() => {
+        if (!saved) newCard(BINGO_FALLBACK, false);
+      });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function newCard(sq, saveUndo = true) {
