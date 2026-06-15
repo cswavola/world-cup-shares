@@ -1,0 +1,16 @@
+{
+  "name": "world-cup-shares",
+  "version": "1.0.0",
+  "private": true,
+  "description": "WC26 Shares — a small static web app for a World Cup pool.",
+  "scripts": {
+    "build": "esbuild app.jsx --loader:.jsx=jsx --outfile=app.js",
+    "dev": "esbuild app.jsx --loader:.jsx=jsx --outfile=app.js --watch",
+    "validate": "node validate-json.js",
+    "check": "npm run build && npm run validate",
+    "setup": "node setup.js"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.1"
+  }
+}

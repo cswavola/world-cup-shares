@@ -1,0 +1,21 @@
+#!/bin/sh
+# Pre-commit hook for WC26 Shares. Lives at the repo ROOT (committed); each clone
+# installs it into .git/hooks via `npm run setup`.
+#
+# When a commit touches app.jsx or a data file, this rebuilds app.js from app.jsx,
+# validates the JSON files, and stages the rebuilt app.js into the commit — so the
+# built file can never drift from the source (the drift is what hid the Fixtures tab).
+#
+# A failing build (JSX syntax error) or invalid JSON aborts the commit.
+# Emergency bypass: git commit --no-verify
+
+if git diff --cached --name-only | grep -qE '\.(jsx|json|webmanifest)$'; then
+  echo "pre-commit: building app.js and validating JSON..."
+  if [ ! -d node_modules ]; then
+    echo "pre-commit: node_modules not found. Run 'npm install' first."
+    exit 1
+  fi
+  npm run build || { echo "pre-commit: build failed -- commit aborted."; exit 1; }
+  npm run validate || { echo "pre-commit: JSON validation failed -- commit aborted."; exit 1; }
+  git add app.js
+fi
