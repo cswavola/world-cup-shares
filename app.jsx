@@ -69,6 +69,7 @@ const ChevronUp = (p) => <Svg {...p}><path d="m18 15-6-6-6 6" /></Svg>;
 const User = (p) => <Svg {...p}><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></Svg>;
 const Grid = (p) => <Svg {...p}><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></Svg>;
 const Calendar = (p) => <Svg {...p}><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></Svg>;
+const Clock = (p) => <Svg {...p}><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></Svg>;
 
 const T = {
   bg: "#F4F6F1", ink: "#16251D", sub: "#5C6B61", green: "#1F6B4A",
@@ -171,6 +172,55 @@ const FIXTURES = [
   ["2026-06-27","17:00-4","PAN","ENG","New York/New Jersey"],
   ["2026-06-27","17:00-4","CRO","GHA","Philadelphia"],
 ].map(([date, time, a, b, city]) => ({ date, time, a, b, city }));
+
+// ---- Kickoff times in the VIEWER's local timezone ---------------------------
+// Each fixture's `time` is the venue-local kickoff plus that venue's UTC offset,
+// e.g. "13:00-6" means 13:00 at UTC-6 (Mexico City). From the offset we recover
+// the absolute instant, then render it in whatever timezone the viewer's device
+// is set to — so everyone sees kickoffs in their own time rather than the venue's.
+function fixtureInstant(f) {
+  const m = /^(\d{1,2}):(\d{2})\s*([+-]\d{1,2})(?::?(\d{2}))?$/.exec((f.time || "").trim());
+  if (!m) return null;
+  const [, hh, mm, offH, offM] = m;
+  const sign = offH[0] === "-" ? "-" : "+";
+  const oh = String(Math.abs(parseInt(offH, 10))).padStart(2, "0");
+  const om = (offM || "00").padStart(2, "0");
+  const d = new Date(`${f.date}T${hh.padStart(2, "0")}:${mm}:00${sign}${oh}:${om}`);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+// Kickoff time in the viewer's local zone, 24h, e.g. "20:00".
+// Falls back to the raw venue time (minus offset) if parsing ever fails.
+function localKickoff(f) {
+  const d = fixtureInstant(f);
+  if (!d) return (f.time || "").split("-")[0];
+  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+}
+
+// The viewer-local calendar date of a fixture's kickoff, as "YYYY-MM-DD".
+// Fixtures are grouped by this so each match sits under the day it actually
+// kicks off in the viewer's timezone (a late Americas game can be "tomorrow"
+// in Europe/Asia). Falls back to the venue date if parsing ever fails.
+function localDateKey(f) {
+  const d = fixtureInstant(f);
+  if (!d) return f.date;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+// Today's date in the viewer's local timezone, as "YYYY-MM-DD".
+function localToday() {
+  const n = new Date();
+  return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
+}
+
+// The viewer's IANA timezone name (e.g. "Europe/London"), best-effort.
+function viewerTimezone() {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "your local time";
+  } catch (e) {
+    return "your local time";
+  }
+}
 
 
 const STAGES = [
@@ -397,10 +447,13 @@ function FragmentRow({ r }) {
 function PlayerView({ state, setState }) {
   const board = useMemo(() => leaderboard(state), [state]);
   const sel = board.find((p) => p.id === state.me) || board[0];
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localToday();
   const fixtures = useMemo(() => {
     if (!sel) return [];
-    return FIXTURES.filter((f) => f.date >= today && (sel.shares[f.a] || sel.shares[f.b])).slice(0, 14);
+    return FIXTURES
+      .filter((f) => localDateKey(f) >= today && (sel.shares[f.a] || sel.shares[f.b]))
+      .sort((a, b) => (fixtureInstant(a) || 0) - (fixtureInstant(b) || 0))
+      .slice(0, 14);
   }, [sel, today]);
 
   if (!sel)
@@ -465,9 +518,11 @@ function PlayerView({ state, setState }) {
                   <span style={{ color: T.sub }}> v </span>
                   <b style={{ color: sel.shares[f.b] ? T.green : T.ink }}>{TEAM[f.b].name}</b>
                 </span>
-                <span style={{ fontFamily: MONO, fontSize: 11, color: T.sub }}>{fmtDate(f.date)}</span>
+                <span style={{ fontFamily: MONO, fontSize: 11, color: T.sub }}>{fmtDate(localDateKey(f))}</span>
               </div>
-              <div style={{ fontSize: 11, color: T.sub, marginTop: 2 }}>{f.city} · kickoff {f.time}</div>
+              <div style={{ fontSize: 11, color: T.sub, marginTop: 2 }}>
+                {f.city} · kickoff {localKickoff(f)}
+              </div>
             </div>
           ))}
         </Card>
@@ -862,7 +917,7 @@ function FixturesView({ state }) {
     }
   }, []);
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localToday();
 
   const resultByKey = {};
   for (const m of state.matches) {
@@ -870,10 +925,16 @@ function FixturesView({ state }) {
     resultByKey[key] = m;
   }
 
+  // Group each fixture under the day it kicks off in the viewer's timezone,
+  // and order each day's matches by their actual kickoff instant.
   const byDate = {};
   for (const f of FIXTURES) {
-    if (!byDate[f.date]) byDate[f.date] = [];
-    byDate[f.date].push(f);
+    const key = localDateKey(f);
+    if (!byDate[key]) byDate[key] = [];
+    byDate[key].push(f);
+  }
+  for (const k of Object.keys(byDate)) {
+    byDate[k].sort((a, b) => (fixtureInstant(a) || 0) - (fixtureInstant(b) || 0));
   }
   const dates = Object.keys(byDate).sort();
 
@@ -892,6 +953,14 @@ function FixturesView({ state }) {
 
   return (
     <div className="flex flex-col gap-4">
+
+      <div style={{
+        fontSize: 11, color: T.sub, margin: "0 4px",
+        display: "flex", alignItems: "center", gap: 6,
+      }}>
+        <Clock size={12} />
+        Dates &amp; kickoff times shown in your local time · {viewerTimezone()}
+      </div>
 
       {/* Back to today button — fixed above the nav bar */}
       <button
@@ -969,7 +1038,7 @@ function FixturesView({ state }) {
                         color: match ? (match.outcome === "draw" ? T.sub : T.green) : T.sub,
                         fontWeight: match ? 700 : 400,
                       }}>
-                        {scoreStr || (match ? "Draw" : f.time.split("-")[0])}
+                        {scoreStr || (match ? "Draw" : localKickoff(f))}
                       </span>
                     </div>
                     <div style={{ fontSize: 11, color: T.sub, marginTop: 2 }}>

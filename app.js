@@ -47,6 +47,7 @@ const ChevronUp = (p) => /* @__PURE__ */ React.createElement(Svg, { ...p }, /* @
 const User = (p) => /* @__PURE__ */ React.createElement(Svg, { ...p }, /* @__PURE__ */ React.createElement("path", { d: "M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" }), /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "7", r: "4" }));
 const Grid = (p) => /* @__PURE__ */ React.createElement(Svg, { ...p }, /* @__PURE__ */ React.createElement("rect", { x: "3", y: "3", width: "7", height: "7" }), /* @__PURE__ */ React.createElement("rect", { x: "14", y: "3", width: "7", height: "7" }), /* @__PURE__ */ React.createElement("rect", { x: "14", y: "14", width: "7", height: "7" }), /* @__PURE__ */ React.createElement("rect", { x: "3", y: "14", width: "7", height: "7" }));
 const Calendar = (p) => /* @__PURE__ */ React.createElement(Svg, { ...p }, /* @__PURE__ */ React.createElement("rect", { x: "3", y: "4", width: "18", height: "18", rx: "2" }), /* @__PURE__ */ React.createElement("path", { d: "M16 2v4M8 2v4M3 10h18" }));
+const Clock = (p) => /* @__PURE__ */ React.createElement(Svg, { ...p }, /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "12", r: "10" }), /* @__PURE__ */ React.createElement("path", { d: "M12 6v6l4 2" }));
 const T = {
   bg: "#F4F6F1",
   ink: "#16251D",
@@ -185,6 +186,37 @@ const FIXTURES = [
   ["2026-06-27", "17:00-4", "PAN", "ENG", "New York/New Jersey"],
   ["2026-06-27", "17:00-4", "CRO", "GHA", "Philadelphia"]
 ].map(([date, time, a, b, city]) => ({ date, time, a, b, city }));
+function fixtureInstant(f) {
+  const m = /^(\d{1,2}):(\d{2})\s*([+-]\d{1,2})(?::?(\d{2}))?$/.exec((f.time || "").trim());
+  if (!m) return null;
+  const [, hh, mm, offH, offM] = m;
+  const sign = offH[0] === "-" ? "-" : "+";
+  const oh = String(Math.abs(parseInt(offH, 10))).padStart(2, "0");
+  const om = (offM || "00").padStart(2, "0");
+  const d = /* @__PURE__ */ new Date(`${f.date}T${hh.padStart(2, "0")}:${mm}:00${sign}${oh}:${om}`);
+  return isNaN(d.getTime()) ? null : d;
+}
+function localKickoff(f) {
+  const d = fixtureInstant(f);
+  if (!d) return (f.time || "").split("-")[0];
+  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+}
+function localDateKey(f) {
+  const d = fixtureInstant(f);
+  if (!d) return f.date;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+function localToday() {
+  const n = /* @__PURE__ */ new Date();
+  return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
+}
+function viewerTimezone() {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "your local time";
+  } catch (e) {
+    return "your local time";
+  }
+}
 const STAGES = [
   { id: "group", label: "Group stage", win: 1, draw: 0.5 },
   { id: "r32", label: "Round of 32", win: 2 },
@@ -342,10 +374,10 @@ function FragmentRow({ r }) {
 function PlayerView({ state, setState }) {
   const board = useMemo(() => leaderboard(state), [state]);
   const sel = board.find((p) => p.id === state.me) || board[0];
-  const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+  const today = localToday();
   const fixtures = useMemo(() => {
     if (!sel) return [];
-    return FIXTURES.filter((f) => f.date >= today && (sel.shares[f.a] || sel.shares[f.b])).slice(0, 14);
+    return FIXTURES.filter((f) => localDateKey(f) >= today && (sel.shares[f.a] || sel.shares[f.b])).sort((a, b) => (fixtureInstant(a) || 0) - (fixtureInstant(b) || 0)).slice(0, 14);
   }, [sel, today]);
   if (!sel)
     return /* @__PURE__ */ React.createElement(Card, { style: { padding: 16, color: T.sub, fontSize: 14 } }, "No players yet \u2014 add them in the Picks tab.");
@@ -375,7 +407,7 @@ function PlayerView({ state, setState }) {
       /* @__PURE__ */ React.createElement("span", { style: { display: "inline-block", width: 8, height: 8, borderRadius: 4, background: PLAYER_COLORS[i % 10], marginRight: 6 } }),
       p.name
     );
-  })), /* @__PURE__ */ React.createElement(Card, { style: { padding: 14 } }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2" }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 18, fontWeight: 800 } }, sel.name), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: T.sub } }, "#", rank, " of ", board.length, " \xB7 ", sel.rows.length, " teams")), /* @__PURE__ */ React.createElement("div", { style: { textAlign: "right" } }, /* @__PURE__ */ React.createElement("div", { style: { fontFamily: MONO, fontSize: 24, fontWeight: 800, color: T.green } }, fmt(sel.total)), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: T.sub } }, "points")))), /* @__PURE__ */ React.createElement(Card, { style: { padding: "14px 0 8px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 700, fontSize: 14, padding: "0 0 8px 14px" } }, "Where the points come from"), /* @__PURE__ */ React.createElement(DistBars, { rows: dist })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, letterSpacing: 2, color: T.sub, fontWeight: 700, margin: "0 4px 6px" } }, "UPCOMING FIXTURES"), /* @__PURE__ */ React.createElement(Card, null, fixtures.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { padding: 16, color: T.sub, fontSize: 14 } }, "No group fixtures left for these teams. Knockout fixtures appear once the bracket is set."), fixtures.map((f, i) => /* @__PURE__ */ React.createElement("div", { key: i, style: { padding: "10px 12px", borderTop: i ? `1px solid ${T.line}` : "none" } }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2" }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, flex: 1 } }, /* @__PURE__ */ React.createElement("b", { style: { color: sel.shares[f.a] ? T.green : T.ink } }, TEAM[f.a].name), /* @__PURE__ */ React.createElement("span", { style: { color: T.sub } }, " v "), /* @__PURE__ */ React.createElement("b", { style: { color: sel.shares[f.b] ? T.green : T.ink } }, TEAM[f.b].name)), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: MONO, fontSize: 11, color: T.sub } }, fmtDate(f.date))), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: T.sub, marginTop: 2 } }, f.city, " \xB7 kickoff ", f.time))))));
+  })), /* @__PURE__ */ React.createElement(Card, { style: { padding: 14 } }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2" }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 18, fontWeight: 800 } }, sel.name), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: T.sub } }, "#", rank, " of ", board.length, " \xB7 ", sel.rows.length, " teams")), /* @__PURE__ */ React.createElement("div", { style: { textAlign: "right" } }, /* @__PURE__ */ React.createElement("div", { style: { fontFamily: MONO, fontSize: 24, fontWeight: 800, color: T.green } }, fmt(sel.total)), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: T.sub } }, "points")))), /* @__PURE__ */ React.createElement(Card, { style: { padding: "14px 0 8px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 700, fontSize: 14, padding: "0 0 8px 14px" } }, "Where the points come from"), /* @__PURE__ */ React.createElement(DistBars, { rows: dist })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, letterSpacing: 2, color: T.sub, fontWeight: 700, margin: "0 4px 6px" } }, "UPCOMING FIXTURES"), /* @__PURE__ */ React.createElement(Card, null, fixtures.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { padding: 16, color: T.sub, fontSize: 14 } }, "No group fixtures left for these teams. Knockout fixtures appear once the bracket is set."), fixtures.map((f, i) => /* @__PURE__ */ React.createElement("div", { key: i, style: { padding: "10px 12px", borderTop: i ? `1px solid ${T.line}` : "none" } }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2" }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, flex: 1 } }, /* @__PURE__ */ React.createElement("b", { style: { color: sel.shares[f.a] ? T.green : T.ink } }, TEAM[f.a].name), /* @__PURE__ */ React.createElement("span", { style: { color: T.sub } }, " v "), /* @__PURE__ */ React.createElement("b", { style: { color: sel.shares[f.b] ? T.green : T.ink } }, TEAM[f.b].name)), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: MONO, fontSize: 11, color: T.sub } }, fmtDate(localDateKey(f)))), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: T.sub, marginTop: 2 } }, f.city, " \xB7 kickoff ", localKickoff(f)))))));
 }
 function TeamsView({ state }) {
   const tp = useMemo(() => teamPoints(state), [state]);
@@ -707,7 +739,7 @@ function FixturesView({ state }) {
       todayRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
     }
   }, []);
-  const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+  const today = localToday();
   const resultByKey = {};
   for (const m of state.matches) {
     const key = [m.a, m.b].sort().join("-");
@@ -715,8 +747,12 @@ function FixturesView({ state }) {
   }
   const byDate = {};
   for (const f of FIXTURES) {
-    if (!byDate[f.date]) byDate[f.date] = [];
-    byDate[f.date].push(f);
+    const key = localDateKey(f);
+    if (!byDate[key]) byDate[key] = [];
+    byDate[key].push(f);
+  }
+  for (const k of Object.keys(byDate)) {
+    byDate[k].sort((a, b) => (fixtureInstant(a) || 0) - (fixtureInstant(b) || 0));
   }
   const dates = Object.keys(byDate).sort();
   const fmtDate = (d) => (/* @__PURE__ */ new Date(d + "T12:00:00")).toLocaleDateString(void 0, {
@@ -730,7 +766,14 @@ function FixturesView({ state }) {
       todayRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
     }
   };
-  return /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-4" }, /* @__PURE__ */ React.createElement(
+  return /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-4" }, /* @__PURE__ */ React.createElement("div", { style: {
+    fontSize: 11,
+    color: T.sub,
+    margin: "0 4px",
+    display: "flex",
+    alignItems: "center",
+    gap: 6
+  } }, /* @__PURE__ */ React.createElement(Clock, { size: 12 }), "Dates & kickoff times shown in your local time \xB7 ", viewerTimezone()), /* @__PURE__ */ React.createElement(
     "button",
     {
       onClick: scrollToToday,
@@ -784,7 +827,7 @@ function FixturesView({ state }) {
         fontSize: 12,
         color: match ? match.outcome === "draw" ? T.sub : T.green : T.sub,
         fontWeight: match ? 700 : 400
-      } }, scoreStr || (match ? "Draw" : f.time.split("-")[0]))), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: T.sub, marginTop: 2 } }, match ? winnerCode ? `${TEAM[winnerCode].name} won \xB7 ${f.city}` : `Draw \xB7 ${f.city}` : f.city));
+      } }, scoreStr || (match ? "Draw" : localKickoff(f)))), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: T.sub, marginTop: 2 } }, match ? winnerCode ? `${TEAM[winnerCode].name} won \xB7 ${f.city}` : `Draw \xB7 ${f.city}` : f.city));
     })));
   }));
 }
