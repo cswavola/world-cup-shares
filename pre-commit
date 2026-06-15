@@ -1,0 +1,30 @@
+#!/bin/sh
+# Pre-commit hook for WC26 Shares.
+#
+# When a commit touches app.jsx or a data file, this rebuilds app.js from
+# app.jsx, validates the JSON files, and stages the freshly built app.js so it
+# is included in the commit.
+#
+# A failing build (e.g. a JSX syntax error) or invalid JSON exits nonzero, which
+# aborts the commit. To bypass in an emergency: git commit --no-verify
+#
+# Enable once per clone with:  npm run setup   (sets core.hooksPath to .githooks)
+
+# Skip fast for commits that don't touch source or data (README, images, etc.).
+if git diff --cached --name-only | grep -qE '\.(jsx|json|webmanifest)$'; then
+  echo "pre-commit: building app.js and validating JSON..."
+
+  if [ ! -d node_modules ]; then
+    echo "pre-commit: node_modules not found. Run 'npm install' first."
+    exit 1
+  fi
+
+  # esbuild exits nonzero on a syntax error -> commit aborts.
+  npm run build || { echo "pre-commit: build failed -- commit aborted."; exit 1; }
+
+  # Validate hand-edited data files.
+  npm run validate || { echo "pre-commit: JSON validation failed -- commit aborted."; exit 1; }
+
+  # Include the rebuilt app.js in this commit.
+  git add app.js
+fi
