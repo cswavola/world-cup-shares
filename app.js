@@ -573,7 +573,7 @@ function shuffle(arr) {
 function makeBingoCard(squares) {
   const picked = shuffle(squares).slice(0, BINGO_CELLS - 1);
   const cells = [...picked];
-  cells.splice(FREE_INDEX, 0, "FREE");
+  cells.splice(FREE_INDEX, 0, "DIVE");
   return cells;
 }
 function checkBingo(marked) {
