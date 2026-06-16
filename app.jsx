@@ -363,6 +363,45 @@ function ShareBar({ code, players, tot }) {
   );
 }
 
+// Shared ownership detail for one team — same data as TeamsView's ShareBar row.
+// Used in both FixturesView and PlayerView to show who holds shares in a team.
+function TeamOwnershipPanel({ code, state, tp, tot, showTitle = true }) {
+  const owners = state.players
+    .map((p, i) => ({ name: p.name, n: p.shares[code] || 0, color: PLAYER_COLORS[i % 10] }))
+    .filter((o) => o.n > 0);
+
+  return (
+    <div>
+      {showTitle && (
+        <div style={{ fontSize: 11, fontWeight: 700, color: T.sub, marginBottom: 6, letterSpacing: 1 }}>
+          {TEAM[code].name.toUpperCase()}
+          {tp != null && (
+            <span style={{ fontFamily: MONO, fontWeight: 700, color: tp[code] ? T.green : T.sub, marginLeft: 8 }}>
+              {fmt(tp[code])} pts
+            </span>
+          )}
+        </div>
+      )}
+      <div style={{ marginBottom: 6 }}>
+        <ShareBar code={code} players={state.players} tot={tot?.[code]} />
+      </div>
+      {owners.length === 0 ? (
+        <div style={{ fontSize: 12, color: T.sub, fontStyle: "italic" }}>No shares held</div>
+      ) : (
+        <div className="flex flex-col gap-1">
+          {owners.map((o) => (
+            <div key={o.name} className="flex items-center gap-2" style={{ fontSize: 13 }}>
+              <span style={{ width: 8, height: 8, borderRadius: 4, background: o.color, flexShrink: 0 }} />
+              <span style={{ flex: 1 }}>{o.name}</span>
+              <span style={{ fontFamily: MONO, fontWeight: 700, color: T.green }}>{o.n}/{tot?.[code] || o.n} sh</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ---------- views ---------- */
 
 function Leaderboard({ state }) {
@@ -447,6 +486,9 @@ function FragmentRow({ r }) {
 function PlayerView({ state, setState }) {
   const board = useMemo(() => leaderboard(state), [state]);
   const sel = board.find((p) => p.id === state.me) || board[0];
+  const [openFixture, setOpenFixture] = useState(null);
+  const tp = useMemo(() => teamPoints(state), [state]);
+  const tot = useMemo(() => totalShares(state), [state]);
   const today = localToday();
   const fixtures = useMemo(() => {
     if (!sel) return [];
@@ -510,21 +552,36 @@ function PlayerView({ state, setState }) {
               No group fixtures left for these teams. Knockout fixtures appear once the bracket is set.
             </div>
           )}
-          {fixtures.map((f, i) => (
-            <div key={i} style={{ padding: "10px 12px", borderTop: i ? `1px solid ${T.line}` : "none" }}>
-              <div className="flex items-center gap-2">
-                <span style={{ fontSize: 14, flex: 1 }}>
-                  <b style={{ color: sel.shares[f.a] ? T.green : T.ink }}>{TEAM[f.a].name}</b>
-                  <span style={{ color: T.sub }}> v </span>
-                  <b style={{ color: sel.shares[f.b] ? T.green : T.ink }}>{TEAM[f.b].name}</b>
-                </span>
-                <span style={{ fontFamily: MONO, fontSize: 11, color: T.sub }}>{fmtDate(localDateKey(f))}</span>
+          {fixtures.map((f, i) => {
+            const fixtureKey = `${f.date}-${f.a}-${f.b}`;
+            const isFixtureOpen = openFixture === fixtureKey;
+            return (
+              <div key={i} style={{ borderTop: i ? `1px solid ${T.line}` : "none" }}>
+                <button
+                  onClick={() => setOpenFixture(isFixtureOpen ? null : fixtureKey)}
+                  style={{ padding: "10px 12px", display: "block", width: "100%", background: "none", textAlign: "left" }}>
+                  <div className="flex items-center gap-2">
+                    <span style={{ fontSize: 14, flex: 1 }}>
+                      <b style={{ color: sel.shares[f.a] ? T.green : T.ink }}>{TEAM[f.a].name}</b>
+                      <span style={{ color: T.sub }}> v </span>
+                      <b style={{ color: sel.shares[f.b] ? T.green : T.ink }}>{TEAM[f.b].name}</b>
+                    </span>
+                    <span style={{ fontFamily: MONO, fontSize: 11, color: T.sub }}>{fmtDate(localDateKey(f))}</span>
+                    {isFixtureOpen ? <ChevronUp size={14} color={T.sub} /> : <ChevronDown size={14} color={T.sub} />}
+                  </div>
+                  <div style={{ fontSize: 11, color: T.sub, marginTop: 2 }}>
+                    {f.city} · kickoff {localKickoff(f)}
+                  </div>
+                </button>
+                {isFixtureOpen && (
+                  <div style={{ padding: "0 12px 12px", borderTop: `1px solid ${T.soft}`, display: "flex", flexDirection: "column", gap: 14 }}>
+                    <TeamOwnershipPanel code={f.a} state={state} tp={tp} tot={tot} />
+                    <TeamOwnershipPanel code={f.b} state={state} tp={tp} tot={tot} />
+                  </div>
+                )}
               </div>
-              <div style={{ fontSize: 11, color: T.sub, marginTop: 2 }}>
-                {f.city} · kickoff {localKickoff(f)}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </Card>
       </div>
     </div>
@@ -552,12 +609,7 @@ function TeamsView({ state }) {
                     {fmt(tp[t.code])}
                   </span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <div style={{ flex: 1 }}><ShareBar code={t.code} players={state.players} tot={tot[t.code]} /></div>
-                  <span style={{ fontFamily: MONO, fontSize: 11, color: T.sub, width: 50, textAlign: "right" }}>
-                    {tot[t.code] || 0} sh
-                  </span>
-                </div>
+                <TeamOwnershipPanel code={t.code} state={state} tp={tp} tot={tot} showTitle={false} />
               </div>
             ))}
           </Card>
@@ -912,6 +964,9 @@ function BingoView() {
 
 function FixturesView({ state }) {
   const todayRef = useRef(null);
+  const [openFixture, setOpenFixture] = useState(null);
+  const tp = useMemo(() => teamPoints(state), [state]);
+  const tot = useMemo(() => totalShares(state), [state]);
 
   useEffect(() => {
     if (todayRef.current) {
@@ -1021,35 +1076,48 @@ function FixturesView({ state }) {
                   : null;
 
                 return (
-                  <div key={i} style={{
-                    padding: "10px 12px",
-                    borderTop: i ? `1px solid ${T.line}` : "none",
-                  }}>
-                    <div className="flex items-center gap-2">
-                      <span style={{ flex: 1, fontSize: 14 }}>
-                        <b style={{ color: winnerCode === f.a ? T.green : T.ink }}>
-                          {TEAM[f.a].name}
-                        </b>
-                        <span style={{ color: T.sub }}> v </span>
-                        <b style={{ color: winnerCode === f.b ? T.green : T.ink }}>
-                          {TEAM[f.b].name}
-                        </b>
-                      </span>
-                      <span style={{
-                        fontFamily: MONO, fontSize: 12,
-                        color: match ? (match.outcome === "draw" ? T.sub : T.green) : T.sub,
-                        fontWeight: match ? 700 : 400,
-                      }}>
-                        {scoreStr || (match ? "Draw" : localKickoff(f))}
-                      </span>
-                    </div>
-                    <div style={{ fontSize: 11, color: T.sub, marginTop: 2 }}>
-                      {match
-                        ? (winnerCode
-                            ? `${TEAM[winnerCode].name} won · ${f.city}`
-                            : `Draw · ${f.city}`)
-                        : f.city}
-                    </div>
+                  <div key={i} style={{ borderTop: i ? `1px solid ${T.line}` : "none" }}>
+                    <button
+                      onClick={() => {
+                        const key = `${f.date}-${f.a}-${f.b}`;
+                        setOpenFixture(openFixture === key ? null : key);
+                      }}
+                      style={{ padding: "10px 12px", display: "block", width: "100%", background: "none", textAlign: "left" }}>
+                      <div className="flex items-center gap-2">
+                        <span style={{ flex: 1, fontSize: 14 }}>
+                          <b style={{ color: winnerCode === f.a ? T.green : T.ink }}>
+                            {TEAM[f.a].name}
+                          </b>
+                          <span style={{ color: T.sub }}> v </span>
+                          <b style={{ color: winnerCode === f.b ? T.green : T.ink }}>
+                            {TEAM[f.b].name}
+                          </b>
+                        </span>
+                        <span style={{
+                          fontFamily: MONO, fontSize: 12,
+                          color: match ? (match.outcome === "draw" ? T.sub : T.green) : T.sub,
+                          fontWeight: match ? 700 : 400,
+                        }}>
+                          {scoreStr || (match ? "Draw" : localKickoff(f))}
+                        </span>
+                        {openFixture === `${f.date}-${f.a}-${f.b}`
+                          ? <ChevronUp size={14} color={T.sub} />
+                          : <ChevronDown size={14} color={T.sub} />}
+                      </div>
+                      <div style={{ fontSize: 11, color: T.sub, marginTop: 2 }}>
+                        {match
+                          ? (winnerCode
+                              ? `${TEAM[winnerCode].name} won · ${f.city}`
+                              : `Draw · ${f.city}`)
+                          : f.city}
+                      </div>
+                    </button>
+                    {openFixture === `${f.date}-${f.a}-${f.b}` && (
+                      <div style={{ padding: "0 12px 12px", borderTop: `1px solid ${T.soft}`, display: "flex", flexDirection: "column", gap: 14 }}>
+                        <TeamOwnershipPanel code={f.a} state={state} tp={tp} tot={tot} />
+                        <TeamOwnershipPanel code={f.b} state={state} tp={tp} tot={tot} />
+                      </div>
+                    )}
                   </div>
                 );
               })}
