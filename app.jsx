@@ -1106,7 +1106,7 @@ function FixturesView({ state }) {
                           ? <ChevronUp size={14} color={T.sub} />
                           : <ChevronDown size={14} color={T.sub} />}
                       </div>
-                      <div style={{ fontSize: 11, color: T.sub, marginTop: 2 }}>
+                      <div style={{ fontSize: 11, color: T.sub, marginTop: 2, paddingLeft: "1.4em" }}>
                         {match
                           ? (winnerCode
                               ? `${TEAM[winnerCode].name} won · ${f.city}`

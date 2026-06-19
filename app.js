@@ -855,7 +855,7 @@ function FixturesView({ state }) {
           color: match ? match.outcome === "draw" ? T.sub : T.green : T.sub,
           fontWeight: match ? 700 : 400
         } }, scoreStr || (match ? "Draw" : localKickoff(f))), openFixture === `${f.date}-${f.a}-${f.b}` ? /* @__PURE__ */ React.createElement(ChevronUp, { size: 14, color: T.sub }) : /* @__PURE__ */ React.createElement(ChevronDown, { size: 14, color: T.sub })),
-        /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: T.sub, marginTop: 2 } }, match ? winnerCode ? `${TEAM[winnerCode].name} won \xB7 ${f.city}` : `Draw \xB7 ${f.city}` : f.city)
+        /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: T.sub, marginTop: 2, paddingLeft: "1.4em" } }, match ? winnerCode ? `${TEAM[winnerCode].name} won \xB7 ${f.city}` : `Draw \xB7 ${f.city}` : f.city)
       ), openFixture === `${f.date}-${f.a}-${f.b}` && /* @__PURE__ */ React.createElement("div", { style: { padding: "0 12px 12px", borderTop: `1px solid ${T.soft}`, display: "flex", flexDirection: "column", gap: 14 } }, /* @__PURE__ */ React.createElement(TeamOwnershipPanel, { code: f.a, state, tp, tot }), /* @__PURE__ */ React.createElement(TeamOwnershipPanel, { code: f.b, state, tp, tot })));
     })));
   }));
