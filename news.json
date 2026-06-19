@@ -1,0 +1,10 @@
+{
+  "posts": [
+    {
+      "date": "2026-06-18",
+      "author": "Charlotte",
+      "title": "Welcome to the newsfeed!",
+      "body": "Use this tab for written updates, commentary, and trash talk throughout the tournament. Add posts by editing news.json in the repo — newest first."
+    }
+  ]
+}
