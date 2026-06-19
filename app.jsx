@@ -1091,7 +1091,7 @@ function FixturesView({ state }) {
                           <b style={{ color: T.ink }}>{TEAM[f.a].name}</b>
                           <span style={{ color: T.sub }}> v </span>
                           <b style={{ color: T.ink }}>{TEAM[f.b].name}</b>
-                          <span style={{ display: "inline-block", width: "1.4em" }}>
+                          <span style={{ display: "inline-block", width: "1.4em", marginLeft: "0.2em" }}>
                             {winnerCode === f.b ? "⚽" : ""}
                           </span>
                         </span>
