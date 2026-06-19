@@ -1,0 +1,10 @@
+{
+  "posts": [
+    {
+      "date": "2026-06-18",
+      "author": "Charlotte",
+      "title": "Behind the Curtain",
+      "body": "A few things we shipped this week:\n\n• Ownership dropdowns — tap any fixture or your upcoming games in the Players tab to see exactly who holds shares in each team and in what proportion\n• Newsfeed tab — this one! A place for written updates, commentary, and news throughout the tournament\n\nSee what else is in the works: github.com/cswavola/world-cup-shares/issues"
+    }
+  ]
+}

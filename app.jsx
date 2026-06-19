@@ -70,6 +70,7 @@ const User = (p) => <Svg {...p}><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4
 const Grid = (p) => <Svg {...p}><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></Svg>;
 const Calendar = (p) => <Svg {...p}><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></Svg>;
 const Clock = (p) => <Svg {...p}><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></Svg>;
+const Rss = (p) => <Svg {...p}><path d="M4 11a9 9 0 0 1 9 9"/><path d="M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1" fill="currentColor" stroke="none"/></Svg>;
 
 const T = {
   bg: "#F4F6F1", ink: "#16251D", sub: "#5C6B61", green: "#1F6B4A",
@@ -1135,6 +1136,100 @@ function FixturesView({ state }) {
 // END FIXTURES BLOCK
 // =====================================================================
 
+
+// =====================================================================
+// NEWSFEED — written updates loaded from news.json
+// =====================================================================
+
+function NewsfeedView() {
+  const [posts, setPosts] = useState(null);   // null = loading, [] = empty
+  const [error, setError] = useState(false);
+  const [open, setOpen] = useState({});       // index → bool
+
+  useEffect(() => {
+    fetch("news.json", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((d) => {
+        const list = Array.isArray(d.posts) ? d.posts : [];
+        setPosts(list);
+        // first post expanded by default
+        if (list.length) setOpen({ 0: true });
+      })
+      .catch(() => { setPosts([]); setError(true); });
+  }, []);
+
+  const fmtPost = (dateStr) => {
+    try {
+      return new Date(dateStr + "T12:00:00").toLocaleDateString(undefined, {
+        weekday: "short", day: "numeric", month: "short", year: "numeric",
+      });
+    } catch {
+      return dateStr;
+    }
+  };
+
+  if (posts === null) {
+    return (
+      <div style={{ padding: 24, textAlign: "center", color: T.sub, fontSize: 14 }}>
+        Loading updates…
+      </div>
+    );
+  }
+
+  if (error || posts.length === 0) {
+    return (
+      <Card style={{ padding: 20 }}>
+        <div style={{ fontSize: 14, color: T.sub, textAlign: "center" }}>
+          No updates yet. Add posts to <span style={{ fontFamily: MONO }}>news.json</span> in the repo.
+        </div>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      {posts.map((post, i) => {
+        const isOpen = !!open[i];
+        return (
+          <Card key={i}>
+            <button
+              onClick={() => setOpen((o) => ({ ...o, [i]: !o[i] }))}
+              className="w-full text-left"
+              style={{ padding: "14px 16px", display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontWeight: 800, fontSize: 16, flex: 1 }}>
+                {post.title || "Update"}
+              </span>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                {post.date && (
+                  <span style={{ fontSize: 11, color: T.sub }}>{fmtPost(post.date)}</span>
+                )}
+                {isOpen ? <ChevronUp size={16} color={T.sub} /> : <ChevronDown size={16} color={T.sub} />}
+              </div>
+            </button>
+            {isOpen && (
+              <div style={{ padding: "0 16px 14px", borderTop: `1px solid ${T.line}` }}>
+                <div style={{ fontSize: 14, lineHeight: 1.7, color: T.ink, whiteSpace: "pre-wrap", paddingTop: 12 }}>
+                  {post.body}
+                </div>
+                {post.author && (
+                  <div style={{ marginTop: 10, fontSize: 11, color: T.sub, fontWeight: 700 }}>
+                    — {post.author}
+                  </div>
+                )}
+              </div>
+            )}
+          </Card>
+        );
+      })}
+    </div>
+  );
+}
+
+// =====================================================================
+// END NEWSFEED BLOCK
+// =====================================================================
+
+
 function App() {
   const [state, setStateRaw] = useState(null);   // players, demo, me
   const [live, setLive] = useState({ matches: [], advanced: [] });
@@ -1190,8 +1285,9 @@ function App() {
     ["board", "Standings", Trophy],
     ["me", "Players", User],
     ["teams", "Teams", Shield],
-    ["bingo", "Bingo", Grid],
     ["fixtures", "Fixtures", Calendar],
+    ["bingo", "Bingo", Grid],
+    ["news", "News", Rss],
   ];
 
   return (
@@ -1212,8 +1308,9 @@ function App() {
         {tab === "board" && <Leaderboard state={eff} />}
         {tab === "me" && <PlayerView state={eff} setState={setState} />}
         {tab === "teams" && <TeamsView state={eff} />}
-        {tab === "bingo" && <BingoView />}
         {tab === "fixtures" && <FixturesView state={eff} />}
+        {tab === "bingo" && <BingoView />}
+        {tab === "news" && <NewsfeedView />}
       </main>
 
       <nav style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: T.card, borderTop: `1px solid ${T.line}`, display: "flex", paddingBottom: "env(safe-area-inset-bottom)" }}>

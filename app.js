@@ -48,6 +48,7 @@ const User = (p) => /* @__PURE__ */ React.createElement(Svg, { ...p }, /* @__PUR
 const Grid = (p) => /* @__PURE__ */ React.createElement(Svg, { ...p }, /* @__PURE__ */ React.createElement("rect", { x: "3", y: "3", width: "7", height: "7" }), /* @__PURE__ */ React.createElement("rect", { x: "14", y: "3", width: "7", height: "7" }), /* @__PURE__ */ React.createElement("rect", { x: "14", y: "14", width: "7", height: "7" }), /* @__PURE__ */ React.createElement("rect", { x: "3", y: "14", width: "7", height: "7" }));
 const Calendar = (p) => /* @__PURE__ */ React.createElement(Svg, { ...p }, /* @__PURE__ */ React.createElement("rect", { x: "3", y: "4", width: "18", height: "18", rx: "2" }), /* @__PURE__ */ React.createElement("path", { d: "M16 2v4M8 2v4M3 10h18" }));
 const Clock = (p) => /* @__PURE__ */ React.createElement(Svg, { ...p }, /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "12", r: "10" }), /* @__PURE__ */ React.createElement("path", { d: "M12 6v6l4 2" }));
+const Rss = (p) => /* @__PURE__ */ React.createElement(Svg, { ...p }, /* @__PURE__ */ React.createElement("path", { d: "M4 11a9 9 0 0 1 9 9" }), /* @__PURE__ */ React.createElement("path", { d: "M4 4a16 16 0 0 1 16 16" }), /* @__PURE__ */ React.createElement("circle", { cx: "5", cy: "19", r: "1", fill: "currentColor", stroke: "none" }));
 const T = {
   bg: "#F4F6F1",
   ink: "#16251D",
@@ -860,6 +861,52 @@ function FixturesView({ state }) {
     })));
   }));
 }
+function NewsfeedView() {
+  const [posts, setPosts] = useState(null);
+  const [error, setError] = useState(false);
+  const [open, setOpen] = useState({});
+  useEffect(() => {
+    fetch("news.json", { cache: "no-store" }).then((r) => r.ok ? r.json() : Promise.reject()).then((d) => {
+      const list = Array.isArray(d.posts) ? d.posts : [];
+      setPosts(list);
+      if (list.length) setOpen({ 0: true });
+    }).catch(() => {
+      setPosts([]);
+      setError(true);
+    });
+  }, []);
+  const fmtPost = (dateStr) => {
+    try {
+      return (/* @__PURE__ */ new Date(dateStr + "T12:00:00")).toLocaleDateString(void 0, {
+        weekday: "short",
+        day: "numeric",
+        month: "short",
+        year: "numeric"
+      });
+    } catch {
+      return dateStr;
+    }
+  };
+  if (posts === null) {
+    return /* @__PURE__ */ React.createElement("div", { style: { padding: 24, textAlign: "center", color: T.sub, fontSize: 14 } }, "Loading updates\u2026");
+  }
+  if (error || posts.length === 0) {
+    return /* @__PURE__ */ React.createElement(Card, { style: { padding: 20 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: T.sub, textAlign: "center" } }, "No updates yet. Add posts to ", /* @__PURE__ */ React.createElement("span", { style: { fontFamily: MONO } }, "news.json"), " in the repo."));
+  }
+  return /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-3" }, posts.map((post, i) => {
+    const isOpen = !!open[i];
+    return /* @__PURE__ */ React.createElement(Card, { key: i }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: () => setOpen((o) => ({ ...o, [i]: !o[i] })),
+        className: "w-full text-left",
+        style: { padding: "14px 16px", display: "flex", alignItems: "center", gap: 8 }
+      },
+      /* @__PURE__ */ React.createElement("span", { style: { fontWeight: 800, fontSize: 16, flex: 1 } }, post.title || "Update"),
+      /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, flexShrink: 0 } }, post.date && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: T.sub } }, fmtPost(post.date)), isOpen ? /* @__PURE__ */ React.createElement(ChevronUp, { size: 16, color: T.sub }) : /* @__PURE__ */ React.createElement(ChevronDown, { size: 16, color: T.sub }))
+    ), isOpen && /* @__PURE__ */ React.createElement("div", { style: { padding: "0 16px 14px", borderTop: `1px solid ${T.line}` } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, lineHeight: 1.7, color: T.ink, whiteSpace: "pre-wrap", paddingTop: 12 } }, post.body), post.author && /* @__PURE__ */ React.createElement("div", { style: { marginTop: 10, fontSize: 11, color: T.sub, fontWeight: 700 } }, "\u2014 ", post.author)));
+  }));
+}
 function App() {
   const [state, setStateRaw] = useState(null);
   const [live, setLive] = useState({ matches: [], advanced: [] });
@@ -902,10 +949,11 @@ function App() {
     ["board", "Standings", Trophy],
     ["me", "Players", User],
     ["teams", "Teams", Shield],
+    ["fixtures", "Fixtures", Calendar],
     ["bingo", "Bingo", Grid],
-    ["fixtures", "Fixtures", Calendar]
+    ["news", "News", Rss]
   ];
-  return /* @__PURE__ */ React.createElement("div", { style: { minHeight: "100vh", background: T.bg, color: T.ink, fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" } }, /* @__PURE__ */ React.createElement("header", { style: { background: T.greenDark, color: "#fff", padding: "18px 16px 14px", paddingTop: "calc(18px + env(safe-area-inset-top))" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 24, fontWeight: 900, letterSpacing: -0.5 } }, "WC26 ", /* @__PURE__ */ React.createElement("span", { style: { color: T.gold } }, "SHARES")), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, opacity: 0.85, fontFamily: MONO, marginTop: 2 } }, state.players.length, " players \xB7 max 4 shares per team \xB7 ", fmt(distributed), " pts distributed", /* @__PURE__ */ React.createElement("span", { style: { marginLeft: 8, opacity: 0.7 } }, feed === "live" ? "\xB7 live \u2713" : feed === "fallback" ? "\xB7 offline (schedule only)" : "\xB7 syncing\u2026"))), /* @__PURE__ */ React.createElement("main", { style: { padding: 12, paddingBottom: 84, maxWidth: 560, margin: "0 auto" } }, tab === "board" && /* @__PURE__ */ React.createElement(Leaderboard, { state: eff }), tab === "me" && /* @__PURE__ */ React.createElement(PlayerView, { state: eff, setState }), tab === "teams" && /* @__PURE__ */ React.createElement(TeamsView, { state: eff }), tab === "bingo" && /* @__PURE__ */ React.createElement(BingoView, null), tab === "fixtures" && /* @__PURE__ */ React.createElement(FixturesView, { state: eff })), /* @__PURE__ */ React.createElement("nav", { style: { position: "fixed", bottom: 0, left: 0, right: 0, background: T.card, borderTop: `1px solid ${T.line}`, display: "flex", paddingBottom: "env(safe-area-inset-bottom)" } }, tabs.map(([id, label, Icon]) => /* @__PURE__ */ React.createElement(
+  return /* @__PURE__ */ React.createElement("div", { style: { minHeight: "100vh", background: T.bg, color: T.ink, fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" } }, /* @__PURE__ */ React.createElement("header", { style: { background: T.greenDark, color: "#fff", padding: "18px 16px 14px", paddingTop: "calc(18px + env(safe-area-inset-top))" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 24, fontWeight: 900, letterSpacing: -0.5 } }, "WC26 ", /* @__PURE__ */ React.createElement("span", { style: { color: T.gold } }, "SHARES")), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, opacity: 0.85, fontFamily: MONO, marginTop: 2 } }, state.players.length, " players \xB7 max 4 shares per team \xB7 ", fmt(distributed), " pts distributed", /* @__PURE__ */ React.createElement("span", { style: { marginLeft: 8, opacity: 0.7 } }, feed === "live" ? "\xB7 live \u2713" : feed === "fallback" ? "\xB7 offline (schedule only)" : "\xB7 syncing\u2026"))), /* @__PURE__ */ React.createElement("main", { style: { padding: 12, paddingBottom: 84, maxWidth: 560, margin: "0 auto" } }, tab === "board" && /* @__PURE__ */ React.createElement(Leaderboard, { state: eff }), tab === "me" && /* @__PURE__ */ React.createElement(PlayerView, { state: eff, setState }), tab === "teams" && /* @__PURE__ */ React.createElement(TeamsView, { state: eff }), tab === "fixtures" && /* @__PURE__ */ React.createElement(FixturesView, { state: eff }), tab === "bingo" && /* @__PURE__ */ React.createElement(BingoView, null), tab === "news" && /* @__PURE__ */ React.createElement(NewsfeedView, null)), /* @__PURE__ */ React.createElement("nav", { style: { position: "fixed", bottom: 0, left: 0, right: 0, background: T.card, borderTop: `1px solid ${T.line}`, display: "flex", paddingBottom: "env(safe-area-inset-bottom)" } }, tabs.map(([id, label, Icon]) => /* @__PURE__ */ React.createElement(
     "button",
     {
       key: id,
