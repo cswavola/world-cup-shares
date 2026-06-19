@@ -849,13 +849,13 @@ function FixturesView({ state }) {
           },
           style: { padding: "10px 12px", display: "block", width: "100%", background: "none", textAlign: "left" }
         },
-        /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2" }, /* @__PURE__ */ React.createElement("span", { style: { flex: 1, fontSize: 14 } }, /* @__PURE__ */ React.createElement("b", { style: { color: winnerCode === f.a ? T.green : T.ink } }, TEAM[f.a].name), /* @__PURE__ */ React.createElement("span", { style: { color: T.sub } }, " v "), /* @__PURE__ */ React.createElement("b", { style: { color: winnerCode === f.b ? T.green : T.ink } }, TEAM[f.b].name)), /* @__PURE__ */ React.createElement("span", { style: {
+        /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2" }, /* @__PURE__ */ React.createElement("span", { style: { flex: 1, fontSize: 14 } }, /* @__PURE__ */ React.createElement("span", { style: { display: "inline-block", width: 20 } }, winnerCode === f.a ? "\u26BD" : ""), /* @__PURE__ */ React.createElement("b", { style: { color: T.ink } }, TEAM[f.a].name), /* @__PURE__ */ React.createElement("span", { style: { color: T.sub } }, " v "), /* @__PURE__ */ React.createElement("b", { style: { color: T.ink } }, TEAM[f.b].name), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-block", width: 20, marginLeft: 3 } }, winnerCode === f.b ? "\u26BD" : "")), /* @__PURE__ */ React.createElement("span", { style: {
           fontFamily: MONO,
           fontSize: 12,
           color: match ? match.outcome === "draw" ? T.sub : T.green : T.sub,
           fontWeight: match ? 700 : 400
         } }, scoreStr || (match ? "Draw" : localKickoff(f))), openFixture === `${f.date}-${f.a}-${f.b}` ? /* @__PURE__ */ React.createElement(ChevronUp, { size: 14, color: T.sub }) : /* @__PURE__ */ React.createElement(ChevronDown, { size: 14, color: T.sub })),
-        /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: T.sub, marginTop: 2 } }, match ? winnerCode ? `${TEAM[winnerCode].name} won \xB7 ${f.city}` : `Draw \xB7 ${f.city}` : f.city)
+        /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: T.sub, marginTop: 2, paddingLeft: 20 } }, match ? winnerCode ? `${TEAM[winnerCode].name} won \xB7 ${f.city}` : `Draw \xB7 ${f.city}` : f.city)
       ), openFixture === `${f.date}-${f.a}-${f.b}` && /* @__PURE__ */ React.createElement("div", { style: { padding: "0 12px 12px", borderTop: `1px solid ${T.soft}`, display: "flex", flexDirection: "column", gap: 14 } }, /* @__PURE__ */ React.createElement(TeamOwnershipPanel, { code: f.a, state, tp, tot }), /* @__PURE__ */ React.createElement(TeamOwnershipPanel, { code: f.b, state, tp, tot })));
     })));
   }));
