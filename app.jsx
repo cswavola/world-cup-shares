@@ -1085,13 +1085,13 @@ function FixturesView({ state }) {
                       style={{ padding: "10px 12px", display: "block", width: "100%", background: "none", textAlign: "left" }}>
                       <div className="flex items-center gap-2">
                         <span style={{ flex: 1, fontSize: 14 }}>
-                          <span style={{ display: "inline-block", width: "1.4em" }}>
+                          <span style={{ display: "inline-block", width: 20 }}>
                             {winnerCode === f.a ? "⚽" : ""}
                           </span>
                           <b style={{ color: T.ink }}>{TEAM[f.a].name}</b>
                           <span style={{ color: T.sub }}> v </span>
                           <b style={{ color: T.ink }}>{TEAM[f.b].name}</b>
-                          <span style={{ display: "inline-block", width: "1.4em", marginLeft: "0.2em" }}>
+                          <span style={{ display: "inline-block", width: 20, marginLeft: 3 }}>
                             {winnerCode === f.b ? "⚽" : ""}
                           </span>
                         </span>
@@ -1106,7 +1106,7 @@ function FixturesView({ state }) {
                           ? <ChevronUp size={14} color={T.sub} />
                           : <ChevronDown size={14} color={T.sub} />}
                       </div>
-                      <div style={{ fontSize: 11, color: T.sub, marginTop: 2, paddingLeft: "1.4em" }}>
+                      <div style={{ fontSize: 11, color: T.sub, marginTop: 2, paddingLeft: 20 }}>
                         {match
                           ? (winnerCode
                               ? `${TEAM[winnerCode].name} won · ${f.city}`
