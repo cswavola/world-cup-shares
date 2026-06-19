@@ -864,8 +864,13 @@ function FixturesView({ state }) {
 function NewsfeedView() {
   const [posts, setPosts] = useState(null);
   const [error, setError] = useState(false);
+  const [open, setOpen] = useState({});
   useEffect(() => {
-    fetch("news.json", { cache: "no-store" }).then((r) => r.ok ? r.json() : Promise.reject()).then((d) => setPosts(Array.isArray(d.posts) ? d.posts : [])).catch(() => {
+    fetch("news.json", { cache: "no-store" }).then((r) => r.ok ? r.json() : Promise.reject()).then((d) => {
+      const list = Array.isArray(d.posts) ? d.posts : [];
+      setPosts(list);
+      if (list.length) setOpen({ 0: true });
+    }).catch(() => {
       setPosts([]);
       setError(true);
     });
@@ -888,7 +893,19 @@ function NewsfeedView() {
   if (error || posts.length === 0) {
     return /* @__PURE__ */ React.createElement(Card, { style: { padding: 20 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: T.sub, textAlign: "center" } }, "No updates yet. Add posts to ", /* @__PURE__ */ React.createElement("span", { style: { fontFamily: MONO } }, "news.json"), " in the repo."));
   }
-  return /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-3" }, posts.map((post, i) => /* @__PURE__ */ React.createElement(Card, { key: i, style: { padding: "14px 16px" } }, post.title && /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 800, fontSize: 16, marginBottom: 6 } }, post.title), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, lineHeight: 1.6, color: T.ink, whiteSpace: "pre-wrap" } }, post.body), /* @__PURE__ */ React.createElement("div", { style: { marginTop: 10, fontSize: 11, color: T.sub, display: "flex", gap: 8, alignItems: "center" } }, post.author && /* @__PURE__ */ React.createElement("span", { style: { fontWeight: 700 } }, post.author), post.author && post.date && /* @__PURE__ */ React.createElement("span", null, "\xB7"), post.date && /* @__PURE__ */ React.createElement("span", null, fmtPost(post.date))))));
+  return /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-3" }, posts.map((post, i) => {
+    const isOpen = !!open[i];
+    return /* @__PURE__ */ React.createElement(Card, { key: i }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: () => setOpen((o) => ({ ...o, [i]: !o[i] })),
+        className: "w-full text-left",
+        style: { padding: "14px 16px", display: "flex", alignItems: "center", gap: 8 }
+      },
+      /* @__PURE__ */ React.createElement("span", { style: { fontWeight: 800, fontSize: 16, flex: 1 } }, post.title || "Update"),
+      /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, flexShrink: 0 } }, post.date && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: T.sub } }, fmtPost(post.date)), isOpen ? /* @__PURE__ */ React.createElement(ChevronUp, { size: 16, color: T.sub }) : /* @__PURE__ */ React.createElement(ChevronDown, { size: 16, color: T.sub }))
+    ), isOpen && /* @__PURE__ */ React.createElement("div", { style: { padding: "0 16px 14px", borderTop: `1px solid ${T.line}` } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, lineHeight: 1.7, color: T.ink, whiteSpace: "pre-wrap", paddingTop: 12 } }, post.body), post.author && /* @__PURE__ */ React.createElement("div", { style: { marginTop: 10, fontSize: 11, color: T.sub, fontWeight: 700 } }, "\u2014 ", post.author)));
+  }));
 }
 function App() {
   const [state, setStateRaw] = useState(null);

@@ -3,8 +3,8 @@
     {
       "date": "2026-06-18",
       "author": "Charlotte",
-      "title": "Welcome to the newsfeed!",
-      "body": "Use this tab for written updates, commentary, and trash talk throughout the tournament. Add posts by editing news.json in the repo — newest first."
+      "title": "Behind the Curtain",
+      "body": "A few things we shipped this week:\n\n• Ownership dropdowns — tap any fixture or your upcoming games in the Players tab to see exactly who holds shares in each team and in what proportion\n• Newsfeed tab — this one! A place for written updates, commentary, and news throughout the tournament\n\nSee what else is in the works: github.com/cswavola/world-cup-shares/issues"
     }
   ]
 }

@@ -1142,11 +1142,17 @@ function FixturesView({ state }) {
 function NewsfeedView() {
   const [posts, setPosts] = useState(null);   // null = loading, [] = empty
   const [error, setError] = useState(false);
+  const [open, setOpen] = useState({});       // index → bool
 
   useEffect(() => {
     fetch("news.json", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : Promise.reject()))
-      .then((d) => setPosts(Array.isArray(d.posts) ? d.posts : []))
+      .then((d) => {
+        const list = Array.isArray(d.posts) ? d.posts : [];
+        setPosts(list);
+        // first post expanded by default
+        if (list.length) setOpen({ 0: true });
+      })
       .catch(() => { setPosts([]); setError(true); });
   }, []);
 
@@ -1180,23 +1186,39 @@ function NewsfeedView() {
 
   return (
     <div className="flex flex-col gap-3">
-      {posts.map((post, i) => (
-        <Card key={i} style={{ padding: "14px 16px" }}>
-          {post.title && (
-            <div style={{ fontWeight: 800, fontSize: 16, marginBottom: 6 }}>{post.title}</div>
-          )}
-          <div style={{ fontSize: 14, lineHeight: 1.6, color: T.ink, whiteSpace: "pre-wrap" }}>
-            {post.body}
-          </div>
-          <div style={{ marginTop: 10, fontSize: 11, color: T.sub, display: "flex", gap: 8, alignItems: "center" }}>
-            {post.author && (
-              <span style={{ fontWeight: 700 }}>{post.author}</span>
+      {posts.map((post, i) => {
+        const isOpen = !!open[i];
+        return (
+          <Card key={i}>
+            <button
+              onClick={() => setOpen((o) => ({ ...o, [i]: !o[i] }))}
+              className="w-full text-left"
+              style={{ padding: "14px 16px", display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontWeight: 800, fontSize: 16, flex: 1 }}>
+                {post.title || "Update"}
+              </span>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                {post.date && (
+                  <span style={{ fontSize: 11, color: T.sub }}>{fmtPost(post.date)}</span>
+                )}
+                {isOpen ? <ChevronUp size={16} color={T.sub} /> : <ChevronDown size={16} color={T.sub} />}
+              </div>
+            </button>
+            {isOpen && (
+              <div style={{ padding: "0 16px 14px", borderTop: `1px solid ${T.line}` }}>
+                <div style={{ fontSize: 14, lineHeight: 1.7, color: T.ink, whiteSpace: "pre-wrap", paddingTop: 12 }}>
+                  {post.body}
+                </div>
+                {post.author && (
+                  <div style={{ marginTop: 10, fontSize: 11, color: T.sub, fontWeight: 700 }}>
+                    — {post.author}
+                  </div>
+                )}
+              </div>
             )}
-            {post.author && post.date && <span>·</span>}
-            {post.date && <span>{fmtPost(post.date)}</span>}
-          </div>
-        </Card>
-      ))}
+          </Card>
+        );
+      })}
     </div>
   );
 }
