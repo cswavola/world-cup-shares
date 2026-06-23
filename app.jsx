@@ -949,6 +949,24 @@ function BingoView() {
           <span style={{ fontFamily: MONO }}>bingo.json</span> in the repo.
         </div>
       </Card>
+
+      {/* Suggest a square */}
+      <Card style={{ padding: 12 }}>
+        <div style={{ fontSize: 13, color: T.ink, fontWeight: 700, marginBottom: 8 }}>
+          Suggest a square
+        </div>
+        <iframe
+          src="https://docs.google.com/forms/d/e/1FAIpQLSfi68gnIFjJtOt7UcIfm2hSUwUdnn_JJYvAQH6lBqy3BBsUdw/viewform?embedded=true"
+          width="100%"
+          height="400"
+          frameBorder="0"
+          marginHeight="0"
+          marginWidth="0"
+          style={{ display: "block", borderRadius: 8 }}
+        >
+          Loading…
+        </iframe>
+      </Card>
     </div>
   );
 }

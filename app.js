@@ -749,7 +749,19 @@ function BingoView() {
       style: { ...btn(true), flex: 1 }
     },
     "Undo"
-  )), /* @__PURE__ */ React.createElement(Card, { style: { padding: 12 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: T.sub, lineHeight: 1.5 } }, /* @__PURE__ */ React.createElement("b", { style: { color: T.ink } }, "How to play"), /* @__PURE__ */ React.createElement("br", null), "Tap a square when you spot it happening during the match. Tap again to unmark. Get five in a row \u2014 across, down, or diagonal \u2014 to win. The centre square is a free space.", " ", /* @__PURE__ */ React.createElement("b", null, "New card"), " deals a fresh random card (you can undo it if you tap by accident). Add more squares by editing", " ", /* @__PURE__ */ React.createElement("span", { style: { fontFamily: MONO } }, "bingo.json"), " in the repo.")));
+  )), /* @__PURE__ */ React.createElement(Card, { style: { padding: 12 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: T.sub, lineHeight: 1.5 } }, /* @__PURE__ */ React.createElement("b", { style: { color: T.ink } }, "How to play"), /* @__PURE__ */ React.createElement("br", null), "Tap a square when you spot it happening during the match. Tap again to unmark. Get five in a row \u2014 across, down, or diagonal \u2014 to win. The centre square is a free space.", " ", /* @__PURE__ */ React.createElement("b", null, "New card"), " deals a fresh random card (you can undo it if you tap by accident). Add more squares by editing", " ", /* @__PURE__ */ React.createElement("span", { style: { fontFamily: MONO } }, "bingo.json"), " in the repo.")), /* @__PURE__ */ React.createElement(Card, { style: { padding: 12 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: T.ink, fontWeight: 700, marginBottom: 8 } }, "Suggest a square"), /* @__PURE__ */ React.createElement(
+    "iframe",
+    {
+      src: "https://docs.google.com/forms/d/e/1FAIpQLSfi68gnIFjJtOt7UcIfm2hSUwUdnn_JJYvAQH6lBqy3BBsUdw/viewform?embedded=true",
+      width: "100%",
+      height: "400",
+      frameBorder: "0",
+      marginHeight: "0",
+      marginWidth: "0",
+      style: { display: "block", borderRadius: 8 }
+    },
+    "Loading\u2026"
+  )));
 }
 function FixturesView({ state }) {
   const todayRef = useRef(null);
