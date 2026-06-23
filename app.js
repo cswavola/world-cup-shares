@@ -1,5 +1,5 @@
 const { useState, useEffect, useMemo, useRef } = React;
-function RaceChart({ data, players }) {
+function RaceChart({ data, players, milestones = [] }) {
   const W = 320, H = 190, P = { l: 26, r: 8, t: 8, b: 16 };
   const n = data.length;
   const maxV = Math.max(0.5, ...data.flatMap((d) => players.map((p) => d[p.name] || 0)));
@@ -9,6 +9,10 @@ function RaceChart({ data, players }) {
   return /* @__PURE__ */ React.createElement("svg", { viewBox: `0 0 ${W} ${H}`, width: "100%", style: { display: "block" } }, Array.from({ length: ticks + 1 }, (_, k) => {
     const v = maxV * k / ticks, yy = y(v);
     return /* @__PURE__ */ React.createElement("g", { key: k }, /* @__PURE__ */ React.createElement("line", { x1: P.l, y1: yy, x2: W - P.r, y2: yy, stroke: T.line, strokeWidth: "1" }), /* @__PURE__ */ React.createElement("text", { x: P.l - 4, y: yy + 3, textAnchor: "end", fontSize: "7", fill: T.sub, fontFamily: MONO }, v.toFixed(0)));
+  }), n > 1 && milestones.map(({ label, dataIndex }) => {
+    if (dataIndex < 0 || dataIndex >= n) return null;
+    const xv = x(dataIndex);
+    return /* @__PURE__ */ React.createElement("g", { key: label }, /* @__PURE__ */ React.createElement("line", { x1: xv, y1: P.t, x2: xv, y2: H - P.b, stroke: T.sub, strokeWidth: "1", strokeDasharray: "3 2", opacity: "0.45" }), /* @__PURE__ */ React.createElement("text", { x: xv + 2, y: P.t + 7, fontSize: "6", fill: T.sub, fontFamily: MONO, opacity: "0.8" }, label));
   }), players.map((p, i) => /* @__PURE__ */ React.createElement(
     "polyline",
     {
@@ -320,6 +324,30 @@ function pointsRace(state) {
   });
   return data;
 }
+function raceChartMilestones(state) {
+  const chron = [...state.matches].sort((a, b) => (a.date || "") < (b.date || "") ? -1 : 1);
+  const buckets = [
+    { label: "MD1", test: (m) => m.stage === "group" && (m.date || "") <= "2026-06-17" },
+    { label: "MD2", test: (m) => m.stage === "group" && (m.date || "") <= "2026-06-23" },
+    { label: "GS", test: (m) => m.stage === "group" },
+    { label: "R32", test: (m) => m.stage === "r32" },
+    { label: "R16", test: (m) => m.stage === "r16" },
+    { label: "QF", test: (m) => m.stage === "qf" },
+    { label: "SF", test: (m) => m.stage === "sf" }
+  ];
+  const seen = /* @__PURE__ */ new Set();
+  const out = [];
+  for (const { label, test } of buckets) {
+    let last = -1;
+    for (let i = 0; i < chron.length; i++) if (test(chron[i])) last = i;
+    if (last < 0) continue;
+    const di = last + 1;
+    if (seen.has(di)) continue;
+    seen.add(di);
+    out.push({ label, dataIndex: di });
+  }
+  return out;
+}
 function Card({ children, style }) {
   return /* @__PURE__ */ React.createElement("div", { style: { background: T.card, border: `1px solid ${T.line}`, borderRadius: 14, ...style } }, children);
 }
@@ -338,6 +366,7 @@ function Leaderboard({ state }) {
   const [mode, setMode] = useState("table");
   const board = useMemo(() => leaderboard(state), [state]);
   const race = useMemo(() => pointsRace(state), [state]);
+  const milestones = useMemo(() => raceChartMilestones(state), [state]);
   return /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-2" }, /* @__PURE__ */ React.createElement("div", { className: "flex gap-1", style: { background: T.soft, borderRadius: 10, padding: 3 } }, [["table", "Table"], ["race", "Race"]].map(([id, label]) => /* @__PURE__ */ React.createElement(
     "button",
     {
@@ -355,7 +384,7 @@ function Leaderboard({ state }) {
       }
     },
     label
-  ))), mode === "race" && /* @__PURE__ */ React.createElement(Card, { style: { padding: "12px 4px 4px" } }, /* @__PURE__ */ React.createElement(RaceChart, { data: race, players: state.players }), /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap gap-2", style: { padding: "6px 10px" } }, state.players.map((p, i) => /* @__PURE__ */ React.createElement("span", { key: p.id, style: { fontSize: 11, color: T.sub, display: "inline-flex", alignItems: "center", gap: 4 } }, /* @__PURE__ */ React.createElement("span", { style: { width: 8, height: 8, borderRadius: 4, background: PLAYER_COLORS[i % 10] } }), p.name))), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: T.sub, padding: "0 10px 6px" } }, "Cumulative points after each result.")), mode === "table" && board.map((p, i) => {
+  ))), mode === "race" && /* @__PURE__ */ React.createElement(Card, { style: { padding: "12px 4px 4px" } }, /* @__PURE__ */ React.createElement(RaceChart, { data: race, players: state.players, milestones }), /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap gap-2", style: { padding: "6px 10px" } }, state.players.map((p, i) => /* @__PURE__ */ React.createElement("span", { key: p.id, style: { fontSize: 11, color: T.sub, display: "inline-flex", alignItems: "center", gap: 4 } }, /* @__PURE__ */ React.createElement("span", { style: { width: 8, height: 8, borderRadius: 4, background: PLAYER_COLORS[i % 10] } }), p.name))), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: T.sub, padding: "0 10px 6px" } }, "Cumulative points after each result.")), mode === "table" && board.map((p, i) => {
     const color = PLAYER_COLORS[state.players.findIndex((x) => x.id === p.id) % 10];
     const isOpen = open === p.id;
     return /* @__PURE__ */ React.createElement(Card, { key: p.id, style: i === 0 && p.total > 0 ? { borderColor: T.gold, boxShadow: `0 0 0 1px ${T.gold}` } : {} }, /* @__PURE__ */ React.createElement(
