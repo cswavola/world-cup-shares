@@ -6,7 +6,8 @@
     { "id": "p3", "name": "Jess", "shares": { "FRA": 3, "GER": 3, "ARG": 1, "BRA": 1, "ESP": 2 } },
     { "id": "p4", "name": "Tim", "shares": { "ARG": 2, "GER": 2, "FRA": 3, "NED": 2, "ESP": 1 } },
     { "id": "p5", "name": "Ryan", "shares": { "ENG": 2, "MAR": 2, "BRA": 1, "FRA": 1, "CAN": 1, "NED": 1, "GER": 1, "ARG": 1 } },
-    { "id": "p6", "name": "Queen C", "shares": { "ARG": 2, "BRA": 2, "USA": 2, "CRO": 1, "MAR": 1, "ESP": 1, "ENG": 1 } }
+    { "id": "p6", "name": "Queen C", "shares": { "ARG": 2, "BRA": 2, "USA": 2, "CRO": 1, "MAR": 1, "ESP": 1, "ENG": 1 } },
+    { "id": "p7", "name": "Cosmo", "shares": { "FRA": 2, "NED": 2, "NOR": 1, "ARG": 1, "GER": 1, "ENG": 1 } }
   ],
   "matches": [],
   "advanced": []
