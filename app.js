@@ -880,6 +880,7 @@ function NewsfeedView() {
   useEffect(() => {
     fetch("news.json", { cache: "no-store" }).then((r) => r.ok ? r.json() : Promise.reject()).then((d) => {
       const list = Array.isArray(d.posts) ? d.posts : [];
+      list.sort((a, b) => (b.date || "") < (a.date || "") ? -1 : (b.date || "") > (a.date || "") ? 1 : 0);
       setPosts(list);
       if (list.length) setOpen({ 0: true });
     }).catch(() => {
