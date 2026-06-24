@@ -1329,6 +1329,15 @@ function App() {
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((o) => { if (o) setOverride({ matches: o.matches || [], advanced: o.advanced || [] }); })
       .catch(() => {});
+
+    // eagerly check for recent posts so the dot shows before the News tab is visited
+    fetch("news.json", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((d) => {
+        const list = Array.isArray(d.posts) ? d.posts : [];
+        setHasRecentNews(list.some((p) => isPostRecent(p.date)));
+      })
+      .catch(() => {});
   }, []);
 
   // only the selected player is remembered on the device

@@ -984,6 +984,11 @@ function App() {
       if (o) setOverride({ matches: o.matches || [], advanced: o.advanced || [] });
     }).catch(() => {
     });
+    fetch("news.json", { cache: "no-store" }).then((r) => r.ok ? r.json() : Promise.reject()).then((d) => {
+      const list = Array.isArray(d.posts) ? d.posts : [];
+      setHasRecentNews(list.some((p) => isPostRecent(p.date)));
+    }).catch(() => {
+    });
   }, []);
   const setState = (fn) => setStateRaw((prev) => {
     const next = typeof fn === "function" ? fn(prev) : fn;
