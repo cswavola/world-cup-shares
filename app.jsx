@@ -1197,7 +1197,14 @@ function FixturesView({ state }) {
 // NEWSFEED — written updates loaded from news.json
 // =====================================================================
 
-function NewsfeedView() {
+function isPostRecent(dateStr) {
+  if (!dateStr) return false;
+  const postDate = new Date(dateStr + "T00:00:00");
+  const daysOld = (Date.now() - postDate.getTime()) / (24 * 60 * 60 * 1000);
+  return daysOld < 2;
+}
+
+function NewsfeedView({ onPostsLoaded }) {
   const [posts, setPosts] = useState(null);   // null = loading, [] = empty
   const [error, setError] = useState(false);
   const [open, setOpen] = useState({});       // index → bool
@@ -1209,11 +1216,12 @@ function NewsfeedView() {
         const list = Array.isArray(d.posts) ? d.posts : [];
         list.sort((a, b) => (b.date || "") < (a.date || "") ? -1 : (b.date || "") > (a.date || "") ? 1 : 0);
         setPosts(list);
+        if (onPostsLoaded) onPostsLoaded(list.some((p) => isPostRecent(p.date)));
         // first post expanded by default
         if (list.length) setOpen({ 0: true });
       })
       .catch(() => { setPosts([]); setError(true); });
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fmtPost = (dateStr) => {
     try {
@@ -1293,6 +1301,7 @@ function App() {
   const [override, setOverride] = useState({ matches: [], advanced: [] });
   const [feed, setFeed] = useState("loading");    // loading | live | fallback
   const [tab, setTab] = useState("board");
+  const [hasRecentNews, setHasRecentNews] = useState(false);
 
   // 1) boot from demo, 2) picks.json sets the roster, 3) live feed, 4) optional results.json override
   useEffect(() => {
@@ -1376,7 +1385,7 @@ function App() {
         {tab === "teams" && <TeamsView state={eff} />}
         {tab === "fixtures" && <FixturesView state={eff} />}
         {tab === "bingo" && <BingoView />}
-        {tab === "news" && <NewsfeedView />}
+        {tab === "news" && <NewsfeedView onPostsLoaded={setHasRecentNews} />}
       </main>
 
       <nav style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: T.card, borderTop: `1px solid ${T.line}`, display: "flex", paddingBottom: "env(safe-area-inset-bottom)" }}>
@@ -1384,7 +1393,16 @@ function App() {
           <button key={id} onClick={() => setTab(id)}
             style={{ flex: 1, padding: "10px 0 8px", display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
               color: tab === id ? T.green : T.sub, fontWeight: tab === id ? 700 : 500, fontSize: 11 }}>
-            <Icon size={20} />
+            <span style={{ position: "relative", display: "inline-flex" }}>
+              <Icon size={20} />
+              {id === "news" && hasRecentNews && tab !== "news" && (
+                <span style={{
+                  position: "absolute", top: -2, right: -4,
+                  width: 7, height: 7, borderRadius: "50%",
+                  background: T.gold, border: `1.5px solid ${T.card}`,
+                }} />
+              )}
+            </span>
             {label}
           </button>
         ))}
