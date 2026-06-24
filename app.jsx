@@ -11,7 +11,7 @@ const { useState, useEffect, useMemo, useRef } = React;
 
 
 /* ---- charts, drawn in plain SVG (no chart library) ---- */
-function RaceChart({ data, players }) {
+function RaceChart({ data, players, milestones = [] }) {
   const W = 320, H = 190, P = { l: 26, r: 8, t: 8, b: 16 };
   const n = data.length;
   const maxV = Math.max(0.5, ...data.flatMap((d) => players.map((p) => d[p.name] || 0)));
@@ -26,6 +26,16 @@ function RaceChart({ data, players }) {
           <g key={k}>
             <line x1={P.l} y1={yy} x2={W - P.r} y2={yy} stroke={T.line} strokeWidth="1" />
             <text x={P.l - 4} y={yy + 3} textAnchor="end" fontSize="7" fill={T.sub} fontFamily={MONO}>{v.toFixed(0)}</text>
+          </g>
+        );
+      })}
+      {n > 1 && milestones.map(({ label, dataIndex }) => {
+        if (dataIndex < 0 || dataIndex >= n) return null;
+        const xv = x(dataIndex);
+        return (
+          <g key={label}>
+            <line x1={xv} y1={P.t} x2={xv} y2={H - P.b} stroke={T.sub} strokeWidth="1" strokeDasharray="3 2" opacity="0.45" />
+            <text x={xv + 2} y={P.t + 7} fontSize="6" fill={T.sub} fontFamily={MONO} opacity="0.8">{label}</text>
           </g>
         );
       })}
@@ -337,6 +347,33 @@ function pointsRace(state) {
   return data;
 }
 
+// Returns milestone positions for the race chart — one per major phase boundary.
+// dataIndex is 1-based (data[0] is the initial snapshot, data[i] is after match i-1).
+function raceChartMilestones(state) {
+  const chron = [...state.matches].sort((a, b) => (a.date || "") < (b.date || "") ? -1 : 1);
+  const buckets = [
+    { label: "MD1", test: (m) => m.stage === "group" && (m.date || "") <= "2026-06-17" },
+    { label: "MD2", test: (m) => m.stage === "group" && (m.date || "") <= "2026-06-23" },
+    { label: "GS",  test: (m) => m.stage === "group" },
+    { label: "R32", test: (m) => m.stage === "r32" },
+    { label: "R16", test: (m) => m.stage === "r16" },
+    { label: "QF",  test: (m) => m.stage === "qf" },
+    { label: "SF",  test: (m) => m.stage === "sf" },
+  ];
+  const seen = new Set();
+  const out = [];
+  for (const { label, test } of buckets) {
+    let last = -1;
+    for (let i = 0; i < chron.length; i++) if (test(chron[i])) last = i;
+    if (last < 0) continue;
+    const di = last + 1;
+    if (seen.has(di)) continue;
+    seen.add(di);
+    out.push({ label, dataIndex: di });
+  }
+  return out;
+}
+
 /* ---------- shared bits ---------- */
 
 function Card({ children, style }) {
@@ -410,6 +447,7 @@ function Leaderboard({ state }) {
   const [mode, setMode] = useState("table");
   const board = useMemo(() => leaderboard(state), [state]);
   const race = useMemo(() => pointsRace(state), [state]);
+  const milestones = useMemo(() => raceChartMilestones(state), [state]);
   return (
     <div className="flex flex-col gap-2">
       <div className="flex gap-1" style={{ background: T.soft, borderRadius: 10, padding: 3 }}>
@@ -425,7 +463,7 @@ function Leaderboard({ state }) {
       </div>
       {mode === "race" && (
         <Card style={{ padding: "12px 4px 4px" }}>
-          <RaceChart data={race} players={state.players} />
+          <RaceChart data={race} players={state.players} milestones={milestones} />
           <div className="flex flex-wrap gap-2" style={{ padding: "6px 10px" }}>
             {state.players.map((p, i) => (
               <span key={p.id} style={{ fontSize: 11, color: T.sub, display: "inline-flex", alignItems: "center", gap: 4 }}>
