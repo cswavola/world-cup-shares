@@ -703,7 +703,7 @@ function parseFeed(data) {
       outcome = x > y ? "a" : "b";
     }
     // matches.push({ id: m.date + a + b, date: m.date, stage, a, b, outcome });
-    matches.push({ id: m.date + a + b, date: m.date, stage, a, b, outcome, score: sc.ft });
+    matches.push({ id: m.date + a + b, date: m.date, time: m.time || null, stage, a, b, outcome, score: sc.ft });
   }
   return { matches, advanced: [...advanced] };
 }
@@ -1338,6 +1338,15 @@ function App() {
   const eff = { ...state, matches: merged.matches, advanced: merged.advanced };
 
   const distributed = Object.values(teamPoints(eff)).reduce((a, b) => a + b, 0);
+
+  const lastResult = merged.matches.length > 0
+    ? merged.matches.reduce((best, m) => (m.date + (m.time || "") > best.date + (best.time || "") ? m : best))
+    : null;
+  const fmtResultDate = ({ date, time }) => {
+    const [, mo, dy] = date.split("-");
+    const d = `${["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][+mo-1]} ${+dy}`;
+    return time ? `${d} ${time}` : d;
+  };
   const tabs = [
     ["board", "Standings", Trophy],
     ["me", "Players", User],
@@ -1356,7 +1365,7 @@ function App() {
         <div style={{ fontSize: 12, opacity: 0.85, fontFamily: MONO, marginTop: 2 }}>
           {state.players.length} players · max 4 shares per team · {fmt(distributed)} pts distributed
           <span style={{ marginLeft: 8, opacity: 0.7 }}>
-            {feed === "live" ? "· live ✓" : feed === "fallback" ? "· offline (schedule only)" : "· syncing…"}
+            {feed === "loading" ? "· syncing…" : feed === "fallback" ? "· offline (schedule only)" : lastResult ? `· updated ${fmtResultDate(lastResult)} ✓` : "· live ✓"}
           </span>
         </div>
       </header>
