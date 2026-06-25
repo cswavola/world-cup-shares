@@ -981,10 +981,9 @@ function BingoView() {
           <b style={{ color: T.ink }}>How to play</b><br />
           Tap a square when you spot it happening during the match.
           Tap again to unmark. Get five in a row — across, down, or
-          diagonal — to win. The centre square is a free space.{" "}
+          diagonal — to win.
           <b>New card</b> deals a fresh random card (you can undo it
-          if you tap by accident). Add more squares by editing{" "}
-          <span style={{ fontFamily: MONO }}>bingo.json</span> in the repo.
+          if you tap by accident).
         </div>
       </Card>
 
