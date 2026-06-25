@@ -908,7 +908,7 @@ function isPostRecent(dateStr) {
   const daysOld = (Date.now() - postDate.getTime()) / (24 * 60 * 60 * 1e3);
   return daysOld < 2;
 }
-function NewsfeedView({ onPostsLoaded }) {
+function NewsfeedView() {
   const [posts, setPosts] = useState(null);
   const [error, setError] = useState(false);
   const [open, setOpen] = useState({});
@@ -917,7 +917,6 @@ function NewsfeedView({ onPostsLoaded }) {
       const list = Array.isArray(d.posts) ? d.posts : [];
       list.sort((a, b) => (b.date || "") < (a.date || "") ? -1 : (b.date || "") > (a.date || "") ? 1 : 0);
       setPosts(list);
-      if (onPostsLoaded) onPostsLoaded(list.some((p) => isPostRecent(p.date)));
       if (list.length) setOpen({ 0: true });
     }).catch(() => {
       setPosts([]);
@@ -962,7 +961,17 @@ function App() {
   const [override, setOverride] = useState({ matches: [], advanced: [] });
   const [feed, setFeed] = useState("loading");
   const [tab, setTab] = useState("board");
-  const [hasRecentNews, setHasRecentNews] = useState(false);
+  const [latestPostDate, setLatestPostDate] = useState(null);
+  const [newsSeenDate, setNewsSeenDate] = useState(
+    () => {
+      try {
+        return localStorage.getItem("wc26-news-seen") || null;
+      } catch {
+        return null;
+      }
+    }
+  );
+  const hasRecentNews = !!latestPostDate && isPostRecent(latestPostDate) && latestPostDate > (newsSeenDate || "");
   useEffect(() => {
     setStateRaw({ ...DEMO, me: loadLocal().me || null });
     fetch("picks.json", { cache: "no-store" }).then((r) => r.ok ? r.json() : Promise.reject()).then((p) => {
@@ -985,8 +994,8 @@ function App() {
     }).catch(() => {
     });
     fetch("news.json", { cache: "no-store" }).then((r) => r.ok ? r.json() : Promise.reject()).then((d) => {
-      const list = Array.isArray(d.posts) ? d.posts : [];
-      setHasRecentNews(list.some((p) => isPostRecent(p.date)));
+      const dates = (Array.isArray(d.posts) ? d.posts : []).map((p) => p.date).filter(Boolean).sort().reverse();
+      if (dates.length) setLatestPostDate(dates[0]);
     }).catch(() => {
     });
   }, []);
@@ -1014,11 +1023,20 @@ function App() {
     ["bingo", "Bingo", Grid],
     ["news", "News", Rss]
   ];
-  return /* @__PURE__ */ React.createElement("div", { style: { minHeight: "100vh", background: T.bg, color: T.ink, fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" } }, /* @__PURE__ */ React.createElement("header", { style: { background: T.greenDark, color: "#fff", padding: "18px 16px 14px", paddingTop: "calc(18px + env(safe-area-inset-top))" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 24, fontWeight: 900, letterSpacing: -0.5 } }, "WC26 ", /* @__PURE__ */ React.createElement("span", { style: { color: T.gold } }, "SHARES")), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, opacity: 0.85, fontFamily: MONO, marginTop: 2 } }, state.players.length, " players \xB7 max 4 shares per team \xB7 ", fmt(distributed), " pts distributed", /* @__PURE__ */ React.createElement("span", { style: { marginLeft: 8, opacity: 0.7 } }, feed === "loading" ? "\xB7 syncing\u2026" : feed === "fallback" ? "\xB7 offline (schedule only)" : lastResult ? `\xB7 updated ${fmtResultDate(lastResult)} \u2713` : "\xB7 live \u2713"))), /* @__PURE__ */ React.createElement("main", { style: { padding: 12, paddingBottom: 84, maxWidth: 560, margin: "0 auto" } }, tab === "board" && /* @__PURE__ */ React.createElement(Leaderboard, { state: eff }), tab === "me" && /* @__PURE__ */ React.createElement(PlayerView, { state: eff, setState }), tab === "teams" && /* @__PURE__ */ React.createElement(TeamsView, { state: eff }), tab === "fixtures" && /* @__PURE__ */ React.createElement(FixturesView, { state: eff }), tab === "bingo" && /* @__PURE__ */ React.createElement(BingoView, null), tab === "news" && /* @__PURE__ */ React.createElement(NewsfeedView, { onPostsLoaded: setHasRecentNews })), /* @__PURE__ */ React.createElement("nav", { style: { position: "fixed", bottom: 0, left: 0, right: 0, background: T.card, borderTop: `1px solid ${T.line}`, display: "flex", paddingBottom: "env(safe-area-inset-bottom)" } }, tabs.map(([id, label, Icon]) => /* @__PURE__ */ React.createElement(
+  return /* @__PURE__ */ React.createElement("div", { style: { minHeight: "100vh", background: T.bg, color: T.ink, fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" } }, /* @__PURE__ */ React.createElement("header", { style: { background: T.greenDark, color: "#fff", padding: "18px 16px 14px", paddingTop: "calc(18px + env(safe-area-inset-top))" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 24, fontWeight: 900, letterSpacing: -0.5 } }, "WC26 ", /* @__PURE__ */ React.createElement("span", { style: { color: T.gold } }, "SHARES")), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, opacity: 0.85, fontFamily: MONO, marginTop: 2 } }, state.players.length, " players \xB7 max 4 shares per team \xB7 ", fmt(distributed), " pts distributed", /* @__PURE__ */ React.createElement("span", { style: { marginLeft: 8, opacity: 0.7 } }, feed === "loading" ? "\xB7 syncing\u2026" : feed === "fallback" ? "\xB7 offline (schedule only)" : lastResult ? `\xB7 updated ${fmtResultDate(lastResult)} \u2713` : "\xB7 live \u2713"))), /* @__PURE__ */ React.createElement("main", { style: { padding: 12, paddingBottom: 84, maxWidth: 560, margin: "0 auto" } }, tab === "board" && /* @__PURE__ */ React.createElement(Leaderboard, { state: eff }), tab === "me" && /* @__PURE__ */ React.createElement(PlayerView, { state: eff, setState }), tab === "teams" && /* @__PURE__ */ React.createElement(TeamsView, { state: eff }), tab === "fixtures" && /* @__PURE__ */ React.createElement(FixturesView, { state: eff }), tab === "bingo" && /* @__PURE__ */ React.createElement(BingoView, null), tab === "news" && /* @__PURE__ */ React.createElement(NewsfeedView, null)), /* @__PURE__ */ React.createElement("nav", { style: { position: "fixed", bottom: 0, left: 0, right: 0, background: T.card, borderTop: `1px solid ${T.line}`, display: "flex", paddingBottom: "env(safe-area-inset-bottom)" } }, tabs.map(([id, label, Icon]) => /* @__PURE__ */ React.createElement(
     "button",
     {
       key: id,
-      onClick: () => setTab(id),
+      onClick: () => {
+        setTab(id);
+        if (id === "news" && latestPostDate) {
+          setNewsSeenDate(latestPostDate);
+          try {
+            localStorage.setItem("wc26-news-seen", latestPostDate);
+          } catch {
+          }
+        }
+      },
       style: {
         flex: 1,
         padding: "10px 0 8px",
@@ -1031,7 +1049,7 @@ function App() {
         fontSize: 11
       }
     },
-    /* @__PURE__ */ React.createElement("span", { style: { position: "relative", display: "inline-flex" } }, /* @__PURE__ */ React.createElement(Icon, { size: 20 }), id === "news" && hasRecentNews && tab !== "news" && /* @__PURE__ */ React.createElement("span", { style: {
+    /* @__PURE__ */ React.createElement("span", { style: { position: "relative", display: "inline-flex" } }, /* @__PURE__ */ React.createElement(Icon, { size: 20 }), id === "news" && hasRecentNews && /* @__PURE__ */ React.createElement("span", { style: {
       position: "absolute",
       top: -2,
       right: -4,

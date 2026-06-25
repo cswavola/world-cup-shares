@@ -1204,7 +1204,7 @@ function isPostRecent(dateStr) {
   return daysOld < 2;
 }
 
-function NewsfeedView({ onPostsLoaded }) {
+function NewsfeedView() {
   const [posts, setPosts] = useState(null);   // null = loading, [] = empty
   const [error, setError] = useState(false);
   const [open, setOpen] = useState({});       // index → bool
@@ -1216,12 +1216,11 @@ function NewsfeedView({ onPostsLoaded }) {
         const list = Array.isArray(d.posts) ? d.posts : [];
         list.sort((a, b) => (b.date || "") < (a.date || "") ? -1 : (b.date || "") > (a.date || "") ? 1 : 0);
         setPosts(list);
-        if (onPostsLoaded) onPostsLoaded(list.some((p) => isPostRecent(p.date)));
         // first post expanded by default
         if (list.length) setOpen({ 0: true });
       })
       .catch(() => { setPosts([]); setError(true); });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   const fmtPost = (dateStr) => {
     try {
@@ -1301,7 +1300,11 @@ function App() {
   const [override, setOverride] = useState({ matches: [], advanced: [] });
   const [feed, setFeed] = useState("loading");    // loading | live | fallback
   const [tab, setTab] = useState("board");
-  const [hasRecentNews, setHasRecentNews] = useState(false);
+  const [latestPostDate, setLatestPostDate] = useState(null);
+  const [newsSeenDate, setNewsSeenDate] = useState(
+    () => { try { return localStorage.getItem("wc26-news-seen") || null; } catch { return null; } }
+  );
+  const hasRecentNews = !!latestPostDate && isPostRecent(latestPostDate) && latestPostDate > (newsSeenDate || "");
 
   // 1) boot from demo, 2) picks.json sets the roster, 3) live feed, 4) optional results.json override
   useEffect(() => {
@@ -1330,12 +1333,12 @@ function App() {
       .then((o) => { if (o) setOverride({ matches: o.matches || [], advanced: o.advanced || [] }); })
       .catch(() => {});
 
-    // eagerly check for recent posts so the dot shows before the News tab is visited
+    // eagerly fetch news so the dot can show before the News tab is visited
     fetch("news.json", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((d) => {
-        const list = Array.isArray(d.posts) ? d.posts : [];
-        setHasRecentNews(list.some((p) => isPostRecent(p.date)));
+        const dates = (Array.isArray(d.posts) ? d.posts : []).map((p) => p.date).filter(Boolean).sort().reverse();
+        if (dates.length) setLatestPostDate(dates[0]);
       })
       .catch(() => {});
   }, []);
@@ -1394,17 +1397,23 @@ function App() {
         {tab === "teams" && <TeamsView state={eff} />}
         {tab === "fixtures" && <FixturesView state={eff} />}
         {tab === "bingo" && <BingoView />}
-        {tab === "news" && <NewsfeedView onPostsLoaded={setHasRecentNews} />}
+        {tab === "news" && <NewsfeedView />}
       </main>
 
       <nav style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: T.card, borderTop: `1px solid ${T.line}`, display: "flex", paddingBottom: "env(safe-area-inset-bottom)" }}>
         {tabs.map(([id, label, Icon]) => (
-          <button key={id} onClick={() => setTab(id)}
+          <button key={id} onClick={() => {
+            setTab(id);
+            if (id === "news" && latestPostDate) {
+              setNewsSeenDate(latestPostDate);
+              try { localStorage.setItem("wc26-news-seen", latestPostDate); } catch {}
+            }
+          }}
             style={{ flex: 1, padding: "10px 0 8px", display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
               color: tab === id ? T.green : T.sub, fontWeight: tab === id ? 700 : 500, fontSize: 11 }}>
             <span style={{ position: "relative", display: "inline-flex" }}>
               <Icon size={20} />
-              {id === "news" && hasRecentNews && tab !== "news" && (
+              {id === "news" && hasRecentNews && (
                 <span style={{
                   position: "absolute", top: -2, right: -4,
                   width: 7, height: 7, borderRadius: "50%",
