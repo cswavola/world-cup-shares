@@ -232,7 +232,7 @@ const STAGES = [
   { id: "final", label: "Final", win: 32 }
 ];
 const STAGE = Object.fromEntries(STAGES.map((s) => [s.id, s]));
-const PLAYER_COLORS = ["#1F6B4A", "#E8A02E", "#3E6FB0", "#C84B3C", "#7A5BA6", "#C0407B", "#F06010", "#5E7D2E", "#9A4D7E", "#54616B"];
+const PLAYER_COLORS = ["#1F6B4A", "#E8A02E", "#3E6FB0", "#C84B3C", "#7A5BA6", "#00B4D8", "#F06010", "#5E7D2E", "#9A4D7E", "#54616B"];
 const DEMO = {
   demo: true,
   me: null,
