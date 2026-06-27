@@ -885,7 +885,8 @@ function BingoView() {
 
   if (!card || !marked) return null;
 
-  const cellSize = Math.min(Math.floor((Math.min(window.innerWidth, 560) - 32) / BINGO_SIZE), 100);
+  // 24px = main padding (12×2), 16px = card padding (8×2), 16px = 4 gaps×4px
+  const cellSize = Math.min(Math.floor((Math.min(window.innerWidth, 560) - 56) / BINGO_SIZE), 100);
 
   return (
     <div className="flex flex-col gap-3">
@@ -902,7 +903,7 @@ function BingoView() {
       )}
 
       {/* Card */}
-      <Card style={{ padding: 8, overflowX: "auto" }}>
+      <Card style={{ padding: 8 }}>
         {/* Column headers */}
         <div style={{ display: "grid", gridTemplateColumns: `repeat(${BINGO_SIZE}, ${cellSize}px)`, gap: 4, margin: "0 auto", width: "fit-content" }}>
           {"BINGO".split("").map((l) => (
