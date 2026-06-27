@@ -1,6 +1,12 @@
 {
   "posts": [
     {
+      "date": "2026-06-27",
+      "author": "Charlotte",
+      "title": "Behind the Curtain",
+      "body": "A few more things that landed since the last update:\n\n• Knockout fixtures — the Fixtures tab now pulls live knockout-round matchups as they're confirmed from the feed\n• Race chart milestones — round markers (Group Stage, Round of 32, Quarters, Semis, Final) now appear as dividers on the points chart\n• Banner timestamp — the header now shows the exact date and time scores were last updated, instead of a generic status\n• News dot — a dot appears on the News tab when a new post arrives and clears once you open it; posts are sorted newest-first\n• Bingo — new squares added, instructions polished, card now fits small phone screens without horizontal scrolling, and there's a "suggest a square" form at the bottom of the tab\n• Player colors — Queen C is now cyan; Cosmo's color was adjusted to be distinct from hers\n• Cosmo — his picks were wired in after his fashionably late entry to the pool\n\nSee what else is in the works: github.com/cswavola/world-cup-shares/issues"
+    },
+    {
       "date": "2026-06-17",
       "author": "The Desk",
       "title": "Dispatch: Matchday 1 — An Empire of Shares",
