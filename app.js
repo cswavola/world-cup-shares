@@ -727,7 +727,7 @@ function BingoView() {
     setPrev(null);
   }
   if (!card || !marked) return null;
-  const cellSize = Math.min(Math.floor((Math.min(window.innerWidth, 560) - 32) / BINGO_SIZE), 100);
+  const cellSize = Math.min(Math.floor((Math.min(window.innerWidth, 560) - 56) / BINGO_SIZE), 100);
   return /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-3" }, hasBingo && /* @__PURE__ */ React.createElement("div", { style: {
     background: T.gold,
     color: T.inkDark || T.greenDark,
@@ -737,7 +737,7 @@ function BingoView() {
     fontWeight: 900,
     fontSize: 28,
     letterSpacing: 2
-  } }, "\u{1F389} BINGO! \u{1F389}"), /* @__PURE__ */ React.createElement(Card, { style: { padding: 8, overflowX: "auto" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: `repeat(${BINGO_SIZE}, ${cellSize}px)`, gap: 4, margin: "0 auto", width: "fit-content" } }, "BINGO".split("").map((l) => /* @__PURE__ */ React.createElement("div", { key: l, style: {
+  } }, "\u{1F389} BINGO! \u{1F389}"), /* @__PURE__ */ React.createElement(Card, { style: { padding: 8 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: `repeat(${BINGO_SIZE}, ${cellSize}px)`, gap: 4, margin: "0 auto", width: "fit-content" } }, "BINGO".split("").map((l) => /* @__PURE__ */ React.createElement("div", { key: l, style: {
     width: cellSize,
     textAlign: "center",
     fontWeight: 900,
