@@ -680,15 +680,31 @@ const ROUND2STAGE = {
   "Round of 32": "r32", "Round of 16": "r16", "Quarter-final": "qf",
   "Semi-final": "sf", "Match for third place": "third", "Final": "final",
 };
+const STAGE2LABEL = {
+  r32: "Round of 32", r16: "Round of 16", qf: "Quarter-final",
+  sf: "Semi-final", third: "Third place", final: "Final",
+};
 
-// Turn the openfootball file into {matches, advanced} our scorer understands.
+// Turn the openfootball file into {matches, advanced, knockoutFixtures} our scorer understands.
 function parseFeed(data) {
   const matches = [];
   const advanced = new Set();
+  const knockoutFixtures = [];
   for (const m of data.matches || []) {
+    const knockoutStage = ROUND2STAGE[m.round];
+    if (knockoutStage) {
+      // Collect knockout fixture whether or not teams are resolved yet
+      knockoutFixtures.push({
+        date: m.date,
+        time: m.time || null,
+        a: NAME2CODE[m.team1] || m.team1,
+        b: NAME2CODE[m.team2] || m.team2,
+        stage: knockoutStage,
+      });
+    }
     const a = NAME2CODE[m.team1], b = NAME2CODE[m.team2];
     if (!a || !b) continue;                       // unresolved placeholder (e.g. "Winner Group A")
-    const stage = ROUND2STAGE[m.round] || "group";
+    const stage = knockoutStage || "group";
     if (stage === "r32") { advanced.add(a); advanced.add(b); }  // reached the knockouts → +1
     const sc = m.score;
     if (!sc || !sc.ft) continue;                  // not played yet
@@ -702,10 +718,9 @@ function parseFeed(data) {
       if (x === y) continue;                       // still undecided
       outcome = x > y ? "a" : "b";
     }
-    // matches.push({ id: m.date + a + b, date: m.date, stage, a, b, outcome });
     matches.push({ id: m.date + a + b, date: m.date, time: m.time || null, stage, a, b, outcome, score: sc.ft });
   }
-  return { matches, advanced: [...advanced] };
+  return { matches, advanced: [...advanced], knockoutFixtures };
 }
 
 // Merge the live feed with an optional results.json override committed from a PC.
@@ -718,6 +733,7 @@ function mergeResults(live, override) {
   return {
     matches: [...byKey.values()],
     advanced: [...new Set([...live.advanced, ...(override.advanced || [])])],
+    knockoutFixtures: live.knockoutFixtures || [],
   };
 }
 
@@ -1040,8 +1056,9 @@ function FixturesView({ state }) {
 
   // Group each fixture under the day it kicks off in the viewer's timezone,
   // and order each day's matches by their actual kickoff instant.
+  const allFixtures = [...FIXTURES, ...(state.knockoutFixtures || [])];
   const byDate = {};
-  for (const f of FIXTURES) {
+  for (const f of allFixtures) {
     const key = localDateKey(f);
     if (!byDate[key]) byDate[key] = [];
     byDate[key].push(f);
@@ -1131,6 +1148,14 @@ function FixturesView({ state }) {
                   ? `${match.score[0]}–${match.score[1]}`
                   : null;
 
+                const teamA = TEAM[f.a];
+                const teamB = TEAM[f.b];
+                const nameA = teamA?.name ?? f.a;
+                const nameB = teamB?.name ?? f.b;
+                const stageLabel = f.stage ? STAGE2LABEL[f.stage] : null;
+                const locationStr = f.city || stageLabel || "";
+                const winnerName = winnerCode ? (TEAM[winnerCode]?.name ?? winnerCode) : null;
+
                 return (
                   <div key={i} style={{ borderTop: i ? `1px solid ${T.line}` : "none" }}>
                     <button
@@ -1144,9 +1169,9 @@ function FixturesView({ state }) {
                           <span style={{ display: "inline-block", width: 20 }}>
                             {winnerCode === f.a ? "⚽" : ""}
                           </span>
-                          <b style={{ color: T.ink }}>{TEAM[f.a].name}</b>
+                          <b style={{ color: T.ink }}>{nameA}</b>
                           <span style={{ color: T.sub }}> v </span>
-                          <b style={{ color: T.ink }}>{TEAM[f.b].name}</b>
+                          <b style={{ color: T.ink }}>{nameB}</b>
                           <span style={{ display: "inline-block", width: 20, marginLeft: 3 }}>
                             {winnerCode === f.b ? "⚽" : ""}
                           </span>
@@ -1164,16 +1189,20 @@ function FixturesView({ state }) {
                       </div>
                       <div style={{ fontSize: 11, color: T.sub, marginTop: 2, paddingLeft: 20 }}>
                         {match
-                          ? (winnerCode
-                              ? `${TEAM[winnerCode].name} won · ${f.city}`
-                              : `Draw · ${f.city}`)
-                          : f.city}
+                          ? (winnerName
+                              ? `${winnerName} won · ${locationStr}`
+                              : `Draw · ${locationStr}`)
+                          : locationStr}
                       </div>
                     </button>
                     {openFixture === `${f.date}-${f.a}-${f.b}` && (
                       <div style={{ padding: "0 12px 12px", borderTop: `1px solid ${T.soft}`, display: "flex", flexDirection: "column", gap: 14 }}>
-                        <TeamOwnershipPanel code={f.a} state={state} tp={tp} tot={tot} />
-                        <TeamOwnershipPanel code={f.b} state={state} tp={tp} tot={tot} />
+                        {teamA
+                          ? <TeamOwnershipPanel code={f.a} state={state} tp={tp} tot={tot} />
+                          : <div style={{ fontSize: 12, color: T.sub, fontStyle: "italic" }}>{nameA} — TBD</div>}
+                        {teamB
+                          ? <TeamOwnershipPanel code={f.b} state={state} tp={tp} tot={tot} />
+                          : <div style={{ fontSize: 12, color: T.sub, fontStyle: "italic" }}>{nameB} — TBD</div>}
                       </div>
                     )}
                   </div>
@@ -1295,7 +1324,7 @@ function NewsfeedView() {
 
 function App() {
   const [state, setStateRaw] = useState(null);   // players, demo, me
-  const [live, setLive] = useState({ matches: [], advanced: [] });
+  const [live, setLive] = useState({ matches: [], advanced: [], knockoutFixtures: [] });
   const [override, setOverride] = useState({ matches: [], advanced: [] });
   const [feed, setFeed] = useState("loading");    // loading | live | fallback
   const [tab, setTab] = useState("board");
@@ -1355,7 +1384,7 @@ function App() {
 
   // effective results = live feed + committed override; this is what every view scores against
   const merged = mergeResults(live, override);
-  const eff = { ...state, matches: merged.matches, advanced: merged.advanced };
+  const eff = { ...state, matches: merged.matches, advanced: merged.advanced, knockoutFixtures: merged.knockoutFixtures };
 
   const distributed = Object.values(teamPoints(eff)).reduce((a, b) => a + b, 0);
 
