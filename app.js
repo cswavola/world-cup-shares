@@ -522,13 +522,32 @@ const ROUND2STAGE = {
   "Match for third place": "third",
   "Final": "final"
 };
+const STAGE2LABEL = {
+  r32: "Round of 32",
+  r16: "Round of 16",
+  qf: "Quarter-final",
+  sf: "Semi-final",
+  third: "Third place",
+  final: "Final"
+};
 function parseFeed(data) {
   const matches = [];
   const advanced = /* @__PURE__ */ new Set();
+  const knockoutFixtures = [];
   for (const m of data.matches || []) {
+    const knockoutStage = ROUND2STAGE[m.round];
+    if (knockoutStage) {
+      knockoutFixtures.push({
+        date: m.date,
+        time: m.time || null,
+        a: NAME2CODE[m.team1] || m.team1,
+        b: NAME2CODE[m.team2] || m.team2,
+        stage: knockoutStage
+      });
+    }
     const a = NAME2CODE[m.team1], b = NAME2CODE[m.team2];
     if (!a || !b) continue;
-    const stage = ROUND2STAGE[m.round] || "group";
+    const stage = knockoutStage || "group";
     if (stage === "r32") {
       advanced.add(a);
       advanced.add(b);
@@ -547,7 +566,7 @@ function parseFeed(data) {
     }
     matches.push({ id: m.date + a + b, date: m.date, time: m.time || null, stage, a, b, outcome, score: sc.ft });
   }
-  return { matches, advanced: [...advanced] };
+  return { matches, advanced: [...advanced], knockoutFixtures };
 }
 function mergeResults(live, override) {
   const key = (m) => `${m.stage}:${[m.a, m.b].sort().join("-")}`;
@@ -556,7 +575,8 @@ function mergeResults(live, override) {
   for (const m of override.matches || []) byKey.set(key(m), m);
   return {
     matches: [...byKey.values()],
-    advanced: [.../* @__PURE__ */ new Set([...live.advanced, ...override.advanced || []])]
+    advanced: [.../* @__PURE__ */ new Set([...live.advanced, ...override.advanced || []])],
+    knockoutFixtures: live.knockoutFixtures || []
   };
 }
 const LS_KEY = "wc26-local-v1";
@@ -707,7 +727,7 @@ function BingoView() {
     setPrev(null);
   }
   if (!card || !marked) return null;
-  const cellSize = Math.min(Math.floor((Math.min(window.innerWidth, 560) - 32) / BINGO_SIZE), 100);
+  const cellSize = Math.min(Math.floor((Math.min(window.innerWidth, 560) - 56) / BINGO_SIZE), 100);
   return /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-3" }, hasBingo && /* @__PURE__ */ React.createElement("div", { style: {
     background: T.gold,
     color: T.inkDark || T.greenDark,
@@ -717,7 +737,7 @@ function BingoView() {
     fontWeight: 900,
     fontSize: 28,
     letterSpacing: 2
-  } }, "\u{1F389} BINGO! \u{1F389}"), /* @__PURE__ */ React.createElement(Card, { style: { padding: 8, overflowX: "auto" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: `repeat(${BINGO_SIZE}, ${cellSize}px)`, gap: 4, margin: "0 auto", width: "fit-content" } }, "BINGO".split("").map((l) => /* @__PURE__ */ React.createElement("div", { key: l, style: {
+  } }, "\u{1F389} BINGO! \u{1F389}"), /* @__PURE__ */ React.createElement(Card, { style: { padding: 8 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: `repeat(${BINGO_SIZE}, ${cellSize}px)`, gap: 4, margin: "0 auto", width: "fit-content" } }, "BINGO".split("").map((l) => /* @__PURE__ */ React.createElement("div", { key: l, style: {
     width: cellSize,
     textAlign: "center",
     fontWeight: 900,
@@ -808,8 +828,9 @@ function FixturesView({ state }) {
     const key = [m.a, m.b].sort().join("-");
     resultByKey[key] = m;
   }
+  const allFixtures = [...FIXTURES, ...state.knockoutFixtures || []];
   const byDate = {};
-  for (const f of FIXTURES) {
+  for (const f of allFixtures) {
     const key = localDateKey(f);
     if (!byDate[key]) byDate[key] = [];
     byDate[key].push(f);
@@ -882,6 +903,13 @@ function FixturesView({ state }) {
       const match = resultByKey[key];
       const winnerCode = match ? match.outcome === "a" ? f.a : match.outcome === "b" ? f.b : null : null;
       const scoreStr = match && match.score ? `${match.score[0]}\u2013${match.score[1]}` : null;
+      const teamA = TEAM[f.a];
+      const teamB = TEAM[f.b];
+      const nameA = teamA?.name ?? f.a;
+      const nameB = teamB?.name ?? f.b;
+      const stageLabel = f.stage ? STAGE2LABEL[f.stage] : null;
+      const locationStr = f.city || stageLabel || "";
+      const winnerName = winnerCode ? TEAM[winnerCode]?.name ?? winnerCode : null;
       return /* @__PURE__ */ React.createElement("div", { key: i, style: { borderTop: i ? `1px solid ${T.line}` : "none" } }, /* @__PURE__ */ React.createElement(
         "button",
         {
@@ -891,14 +919,14 @@ function FixturesView({ state }) {
           },
           style: { padding: "10px 12px", display: "block", width: "100%", background: "none", textAlign: "left" }
         },
-        /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2" }, /* @__PURE__ */ React.createElement("span", { style: { flex: 1, fontSize: 14 } }, /* @__PURE__ */ React.createElement("span", { style: { display: "inline-block", width: 20 } }, winnerCode === f.a ? "\u26BD" : ""), /* @__PURE__ */ React.createElement("b", { style: { color: T.ink } }, TEAM[f.a].name), /* @__PURE__ */ React.createElement("span", { style: { color: T.sub } }, " v "), /* @__PURE__ */ React.createElement("b", { style: { color: T.ink } }, TEAM[f.b].name), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-block", width: 20, marginLeft: 3 } }, winnerCode === f.b ? "\u26BD" : "")), /* @__PURE__ */ React.createElement("span", { style: {
+        /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2" }, /* @__PURE__ */ React.createElement("span", { style: { flex: 1, fontSize: 14 } }, /* @__PURE__ */ React.createElement("span", { style: { display: "inline-block", width: 20 } }, winnerCode === f.a ? "\u26BD" : ""), /* @__PURE__ */ React.createElement("b", { style: { color: T.ink } }, nameA), /* @__PURE__ */ React.createElement("span", { style: { color: T.sub } }, " v "), /* @__PURE__ */ React.createElement("b", { style: { color: T.ink } }, nameB), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-block", width: 20, marginLeft: 3 } }, winnerCode === f.b ? "\u26BD" : "")), /* @__PURE__ */ React.createElement("span", { style: {
           fontFamily: MONO,
           fontSize: 12,
           color: match ? match.outcome === "draw" ? T.sub : T.green : T.sub,
           fontWeight: match ? 700 : 400
         } }, scoreStr || (match ? "Draw" : localKickoff(f))), openFixture === `${f.date}-${f.a}-${f.b}` ? /* @__PURE__ */ React.createElement(ChevronUp, { size: 14, color: T.sub }) : /* @__PURE__ */ React.createElement(ChevronDown, { size: 14, color: T.sub })),
-        /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: T.sub, marginTop: 2, paddingLeft: 20 } }, match ? winnerCode ? `${TEAM[winnerCode].name} won \xB7 ${f.city}` : `Draw \xB7 ${f.city}` : f.city)
-      ), openFixture === `${f.date}-${f.a}-${f.b}` && /* @__PURE__ */ React.createElement("div", { style: { padding: "0 12px 12px", borderTop: `1px solid ${T.soft}`, display: "flex", flexDirection: "column", gap: 14 } }, /* @__PURE__ */ React.createElement(TeamOwnershipPanel, { code: f.a, state, tp, tot }), /* @__PURE__ */ React.createElement(TeamOwnershipPanel, { code: f.b, state, tp, tot })));
+        /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: T.sub, marginTop: 2, paddingLeft: 20 } }, match ? winnerName ? `${winnerName} won \xB7 ${locationStr}` : `Draw \xB7 ${locationStr}` : locationStr)
+      ), openFixture === `${f.date}-${f.a}-${f.b}` && /* @__PURE__ */ React.createElement("div", { style: { padding: "0 12px 12px", borderTop: `1px solid ${T.soft}`, display: "flex", flexDirection: "column", gap: 14 } }, teamA ? /* @__PURE__ */ React.createElement(TeamOwnershipPanel, { code: f.a, state, tp, tot }) : /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: T.sub, fontStyle: "italic" } }, nameA, " \u2014 TBD"), teamB ? /* @__PURE__ */ React.createElement(TeamOwnershipPanel, { code: f.b, state, tp, tot }) : /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: T.sub, fontStyle: "italic" } }, nameB, " \u2014 TBD")));
     })));
   }));
 }
@@ -957,7 +985,7 @@ function NewsfeedView() {
 }
 function App() {
   const [state, setStateRaw] = useState(null);
-  const [live, setLive] = useState({ matches: [], advanced: [] });
+  const [live, setLive] = useState({ matches: [], advanced: [], knockoutFixtures: [] });
   const [override, setOverride] = useState({ matches: [], advanced: [] });
   const [feed, setFeed] = useState("loading");
   const [tab, setTab] = useState("board");
@@ -1007,7 +1035,7 @@ function App() {
   if (!state)
     return /* @__PURE__ */ React.createElement("div", { style: { minHeight: "100vh", background: T.bg, display: "flex", alignItems: "center", justifyContent: "center", color: T.sub } }, "Loading\u2026");
   const merged = mergeResults(live, override);
-  const eff = { ...state, matches: merged.matches, advanced: merged.advanced };
+  const eff = { ...state, matches: merged.matches, advanced: merged.advanced, knockoutFixtures: merged.knockoutFixtures };
   const distributed = Object.values(teamPoints(eff)).reduce((a, b) => a + b, 0);
   const lastResult = merged.matches.length > 0 ? merged.matches.reduce((best, m) => m.date + (m.time || "") > best.date + (best.time || "") ? m : best) : null;
   const fmtResultDate = ({ date, time }) => {
