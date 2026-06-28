@@ -1393,9 +1393,12 @@ function App() {
     ? merged.matches.reduce((best, m) => (m.date + (m.time || "") > best.date + (best.time || "") ? m : best))
     : null;
   const fmtResultDate = ({ date, time }) => {
+    const instant = time ? fixtureInstant({ date, time }) : null;
+    if (instant) {
+      return instant.toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false });
+    }
     const [, mo, dy] = date.split("-");
-    const d = `${["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][+mo-1]} ${+dy}`;
-    return time ? `${d} ${time}` : d;
+    return `${["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][+mo-1]} ${+dy}`;
   };
   const tabs = [
     ["board", "Standings", Trophy],
@@ -1413,7 +1416,7 @@ function App() {
           WC26 <span style={{ color: T.gold }}>SHARES</span>
         </div>
         <div style={{ fontSize: 12, opacity: 0.85, fontFamily: MONO, marginTop: 2 }}>
-          {state.players.length} players · max 4 shares per team · {fmt(distributed)} pts distributed
+          {fmt(distributed)} pts distributed
           <span style={{ marginLeft: 8, opacity: 0.7 }}>
             {feed === "loading" ? "· syncing…" : feed === "fallback" ? "· offline (schedule only)" : lastResult ? `· updated ${fmtResultDate(lastResult)} ✓` : "· live ✓"}
           </span>
