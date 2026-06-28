@@ -192,7 +192,7 @@ const FIXTURES = [
   ["2026-06-27", "17:00-4", "CRO", "GHA", "Philadelphia"]
 ].map(([date, time, a, b, city]) => ({ date, time, a, b, city }));
 function fixtureInstant(f) {
-  const m = /^(\d{1,2}):(\d{2})\s*([+-]\d{1,2})(?::?(\d{2}))?$/.exec((f.time || "").trim());
+  const m = /^(\d{1,2}):(\d{2})\s*(?:UTC\s*)?([+-]\d{1,2})(?::?(\d{2}))?$/.exec((f.time || "").trim());
   if (!m) return null;
   const [, hh, mm, offH, offM] = m;
   const sign = offH[0] === "-" ? "-" : "+";
@@ -1039,9 +1039,12 @@ function App() {
   const distributed = Object.values(teamPoints(eff)).reduce((a, b) => a + b, 0);
   const lastResult = merged.matches.length > 0 ? merged.matches.reduce((best, m) => m.date + (m.time || "") > best.date + (best.time || "") ? m : best) : null;
   const fmtResultDate = ({ date, time }) => {
+    const instant = time ? fixtureInstant({ date, time }) : null;
+    if (instant) {
+      return instant.toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false });
+    }
     const [, mo, dy] = date.split("-");
-    const d = `${["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][+mo - 1]} ${+dy}`;
-    return time ? `${d} ${time}` : d;
+    return `${["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][+mo - 1]} ${+dy}`;
   };
   const tabs = [
     ["board", "Standings", Trophy],
@@ -1051,7 +1054,7 @@ function App() {
     ["bingo", "Bingo", Grid],
     ["news", "News", Rss]
   ];
-  return /* @__PURE__ */ React.createElement("div", { style: { minHeight: "100vh", background: T.bg, color: T.ink, fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" } }, /* @__PURE__ */ React.createElement("header", { style: { background: T.greenDark, color: "#fff", padding: "18px 16px 14px", paddingTop: "calc(18px + env(safe-area-inset-top))" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 24, fontWeight: 900, letterSpacing: -0.5 } }, "WC26 ", /* @__PURE__ */ React.createElement("span", { style: { color: T.gold } }, "SHARES")), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, opacity: 0.85, fontFamily: MONO, marginTop: 2 } }, state.players.length, " players \xB7 max 4 shares per team \xB7 ", fmt(distributed), " pts distributed", /* @__PURE__ */ React.createElement("span", { style: { marginLeft: 8, opacity: 0.7 } }, feed === "loading" ? "\xB7 syncing\u2026" : feed === "fallback" ? "\xB7 offline (schedule only)" : lastResult ? `\xB7 updated ${fmtResultDate(lastResult)} \u2713` : "\xB7 live \u2713"))), /* @__PURE__ */ React.createElement("main", { style: { padding: 12, paddingBottom: 84, maxWidth: 560, margin: "0 auto" } }, tab === "board" && /* @__PURE__ */ React.createElement(Leaderboard, { state: eff }), tab === "me" && /* @__PURE__ */ React.createElement(PlayerView, { state: eff, setState }), tab === "teams" && /* @__PURE__ */ React.createElement(TeamsView, { state: eff }), tab === "fixtures" && /* @__PURE__ */ React.createElement(FixturesView, { state: eff }), tab === "bingo" && /* @__PURE__ */ React.createElement(BingoView, null), tab === "news" && /* @__PURE__ */ React.createElement(NewsfeedView, null)), /* @__PURE__ */ React.createElement("nav", { style: { position: "fixed", bottom: 0, left: 0, right: 0, background: T.card, borderTop: `1px solid ${T.line}`, display: "flex", paddingBottom: "env(safe-area-inset-bottom)" } }, tabs.map(([id, label, Icon]) => /* @__PURE__ */ React.createElement(
+  return /* @__PURE__ */ React.createElement("div", { style: { minHeight: "100vh", background: T.bg, color: T.ink, fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" } }, /* @__PURE__ */ React.createElement("header", { style: { background: T.greenDark, color: "#fff", padding: "18px 16px 14px", paddingTop: "calc(18px + env(safe-area-inset-top))" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 24, fontWeight: 900, letterSpacing: -0.5 } }, "WC26 ", /* @__PURE__ */ React.createElement("span", { style: { color: T.gold } }, "SHARES")), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, opacity: 0.85, fontFamily: MONO, marginTop: 2 } }, fmt(distributed), " pts distributed", /* @__PURE__ */ React.createElement("span", { style: { marginLeft: 8, opacity: 0.7 } }, feed === "loading" ? "\xB7 syncing\u2026" : feed === "fallback" ? "\xB7 offline (schedule only)" : lastResult ? `\xB7 updated ${fmtResultDate(lastResult)} \u2713` : "\xB7 live \u2713"))), /* @__PURE__ */ React.createElement("main", { style: { padding: 12, paddingBottom: 84, maxWidth: 560, margin: "0 auto" } }, tab === "board" && /* @__PURE__ */ React.createElement(Leaderboard, { state: eff }), tab === "me" && /* @__PURE__ */ React.createElement(PlayerView, { state: eff, setState }), tab === "teams" && /* @__PURE__ */ React.createElement(TeamsView, { state: eff }), tab === "fixtures" && /* @__PURE__ */ React.createElement(FixturesView, { state: eff }), tab === "bingo" && /* @__PURE__ */ React.createElement(BingoView, null), tab === "news" && /* @__PURE__ */ React.createElement(NewsfeedView, null)), /* @__PURE__ */ React.createElement("nav", { style: { position: "fixed", bottom: 0, left: 0, right: 0, background: T.card, borderTop: `1px solid ${T.line}`, display: "flex", paddingBottom: "env(safe-area-inset-bottom)" } }, tabs.map(([id, label, Icon]) => /* @__PURE__ */ React.createElement(
     "button",
     {
       key: id,
