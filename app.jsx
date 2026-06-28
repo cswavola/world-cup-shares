@@ -48,19 +48,22 @@ function RaceChart({ data, players, milestones = [] }) {
   );
 }
 
-function DistBars({ rows }) {
+function DistBars({ rows, elim = new Set() }) {
   const max = Math.max(0.01, ...rows.map((r) => r.points));
   return (
     <div className="flex flex-col gap-1" style={{ padding: "0 12px" }}>
-      {rows.map((r) => (
-        <div key={r.team} className="flex items-center gap-2" style={{ fontSize: 12 }}>
-          <span style={{ fontFamily: MONO, width: 34, color: T.sub }}>{r.team}</span>
-          <div style={{ flex: 1, background: T.soft, borderRadius: 4, height: 14, overflow: "hidden" }}>
-            <div style={{ width: `${(r.points / max) * 100}%`, background: T.green, height: "100%", borderRadius: 4, minWidth: r.points > 0 ? 2 : 0 }} />
+      {rows.map((r) => {
+        const isElim = elim.has(r.team);
+        return (
+          <div key={r.team} className="flex items-center gap-2" style={{ fontSize: 12, opacity: isElim ? 0.4 : 1 }}>
+            <span style={{ fontFamily: MONO, width: 34, color: T.sub }}>{r.team}</span>
+            <div style={{ flex: 1, background: T.soft, borderRadius: 4, height: 14, overflow: "hidden" }}>
+              <div style={{ width: `${(r.points / max) * 100}%`, background: isElim ? T.sub : T.green, height: "100%", borderRadius: 4, minWidth: r.points > 0 ? 2 : 0 }} />
+            </div>
+            <span style={{ fontFamily: MONO, width: 38, textAlign: "right", fontWeight: 700 }}>{fmt(r.points)}</span>
           </div>
-          <span style={{ fontFamily: MONO, width: 38, textAlign: "right", fontWeight: 700 }}>{fmt(r.points)}</span>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -316,6 +319,25 @@ function leaderboard(state) {
 
 const fmt = (x) => (Math.round(x * 100) / 100).toFixed(2);
 
+// A team is eliminated when they can no longer earn points:
+// - missed the R32 (once the bracket is set), or
+// - lost in a knockout match (SF losers excluded — they still play the third-place match)
+function eliminatedTeams(state) {
+  const elim = new Set();
+  if (state.advanced.length > 0) {
+    const advSet = new Set(state.advanced);
+    for (const t of TEAMS) {
+      if (!advSet.has(t.code)) elim.add(t.code);
+    }
+  }
+  for (const m of state.matches) {
+    if (m.stage === "group" || m.stage === "sf") continue;
+    if (m.outcome === "a") elim.add(m.b);
+    else if (m.outcome === "b") elim.add(m.a);
+  }
+  return elim;
+}
+
 // Cumulative points after each result, for the race chart.
 // Qualification bonuses are treated as banked from the start so the
 // final data point always matches the standings total.
@@ -448,6 +470,7 @@ function Leaderboard({ state }) {
   const board = useMemo(() => leaderboard(state), [state]);
   const race = useMemo(() => pointsRace(state), [state]);
   const milestones = useMemo(() => raceChartMilestones(state), [state]);
+  const elim = useMemo(() => eliminatedTeams(state), [state]);
   return (
     <div className="flex flex-col gap-2">
       <div className="flex gap-1" style={{ background: T.soft, borderRadius: 10, padding: 3 }}>
@@ -499,7 +522,7 @@ function Leaderboard({ state }) {
                   <span style={{ color: T.sub, fontSize: 11, fontFamily: MONO }}>TEAM PTS</span>
                   <span style={{ color: T.sub, fontSize: 11, fontFamily: MONO }}>YOURS</span>
                   {p.rows.map((r) => (
-                    <FragmentRow key={r.code} r={r} />
+                    <FragmentRow key={r.code} r={r} elim={elim} />
                   ))}
                 </div>
               </div>
@@ -511,13 +534,14 @@ function Leaderboard({ state }) {
   );
 }
 
-function FragmentRow({ r }) {
+function FragmentRow({ r, elim = new Set() }) {
+  const isElim = elim.has(r.code);
   return (
     <>
-      <span>{TEAM[r.code].name}</span>
-      <span style={{ fontFamily: MONO }}>{r.shares}/{r.pool}</span>
-      <span style={{ fontFamily: MONO }}>{fmt(r.teamPts)}</span>
-      <span style={{ fontFamily: MONO, fontWeight: 700, color: T.green }}>{fmt(r.payout)}</span>
+      <span style={{ color: isElim ? T.sub : T.ink, textDecoration: isElim ? "line-through" : "none" }}>{TEAM[r.code].name}</span>
+      <span style={{ fontFamily: MONO, color: isElim ? T.sub : T.ink }}>{r.shares}/{r.pool}</span>
+      <span style={{ fontFamily: MONO, color: isElim ? T.sub : T.ink }}>{fmt(r.teamPts)}</span>
+      <span style={{ fontFamily: MONO, fontWeight: 700, color: isElim ? T.sub : T.green }}>{fmt(r.payout)}</span>
     </>
   );
 }
@@ -528,6 +552,7 @@ function PlayerView({ state, setState }) {
   const [openFixture, setOpenFixture] = useState(null);
   const tp = useMemo(() => teamPoints(state), [state]);
   const tot = useMemo(() => totalShares(state), [state]);
+  const elim = useMemo(() => eliminatedTeams(state), [state]);
   const today = localToday();
   const fixtures = useMemo(() => {
     if (!sel) return [];
@@ -578,7 +603,7 @@ function PlayerView({ state, setState }) {
 
       <Card style={{ padding: "14px 0 8px" }}>
         <div style={{ fontWeight: 700, fontSize: 14, padding: "0 0 8px 14px" }}>Where the points come from</div>
-        <DistBars rows={dist} />
+        <DistBars rows={dist} elim={elim} />
       </Card>
 
       <div>
