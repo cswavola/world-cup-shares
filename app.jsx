@@ -190,7 +190,7 @@ const FIXTURES = [
 // the absolute instant, then render it in whatever timezone the viewer's device
 // is set to — so everyone sees kickoffs in their own time rather than the venue's.
 function fixtureInstant(f) {
-  const m = /^(\d{1,2}):(\d{2})\s*([+-]\d{1,2})(?::?(\d{2}))?$/.exec((f.time || "").trim());
+  const m = /^(\d{1,2}):(\d{2})\s*(?:UTC\s*)?([+-]\d{1,2})(?::?(\d{2}))?$/.exec((f.time || "").trim());
   if (!m) return null;
   const [, hh, mm, offH, offM] = m;
   const sign = offH[0] === "-" ? "-" : "+";
