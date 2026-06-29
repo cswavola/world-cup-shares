@@ -448,7 +448,7 @@ function Leaderboard({ state }) {
 }
 function FragmentRow({ r, elim = /* @__PURE__ */ new Set() }) {
   const isElim = elim.has(r.code);
-  return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("span", { style: { color: isElim ? T.sub : T.ink, textDecoration: isElim ? "line-through" : "none" } }, TEAM[r.code].name), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: MONO, color: isElim ? T.sub : T.ink } }, r.shares, "/", r.pool), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: MONO, color: isElim ? T.sub : T.ink } }, fmt(r.teamPts)), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: MONO, fontWeight: 700, color: isElim ? T.sub : T.green } }, fmt(r.payout)));
+  return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("span", { style: { color: isElim ? T.sub : T.ink } }, TEAM[r.code].name, isElim ? " \u274C" : ""), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: MONO, color: isElim ? T.sub : T.ink } }, r.shares, "/", r.pool), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: MONO, color: isElim ? T.sub : T.ink } }, fmt(r.teamPts)), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: MONO, fontWeight: 700, color: isElim ? T.sub : T.green } }, fmt(r.payout)));
 }
 function PlayerView({ state, setState }) {
   const board = useMemo(() => leaderboard(state), [state]);

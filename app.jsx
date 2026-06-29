@@ -580,7 +580,7 @@ function FragmentRow({ r, elim = new Set() }) {
   const isElim = elim.has(r.code);
   return (
     <>
-      <span style={{ color: isElim ? T.sub : T.ink, textDecoration: isElim ? "line-through" : "none" }}>{TEAM[r.code].name}</span>
+      <span style={{ color: isElim ? T.sub : T.ink }}>{TEAM[r.code].name}{isElim ? " ❌" : ""}</span>
       <span style={{ fontFamily: MONO, color: isElim ? T.sub : T.ink }}>{r.shares}/{r.pool}</span>
       <span style={{ fontFamily: MONO, color: isElim ? T.sub : T.ink }}>{fmt(r.teamPts)}</span>
       <span style={{ fontFamily: MONO, fontWeight: 700, color: isElim ? T.sub : T.green }}>{fmt(r.payout)}</span>
