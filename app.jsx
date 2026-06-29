@@ -647,11 +647,11 @@ function PlayerView({ state, setState }) {
   const today = localToday();
   const fixtures = useMemo(() => {
     if (!sel) return [];
-    return FIXTURES
+    return [...FIXTURES, ...(state.knockoutFixtures || [])]
       .filter((f) => localDateKey(f) >= today && (sel.shares[f.a] || sel.shares[f.b]))
       .sort((a, b) => (fixtureInstant(a) || 0) - (fixtureInstant(b) || 0))
       .slice(0, 14);
-  }, [sel, today]);
+  }, [sel, today, state.knockoutFixtures]);
 
   if (!sel)
     return <Card style={{ padding: 16, color: T.sub, fontSize: 14 }}>No players yet — add them in the Picks tab.</Card>;
@@ -704,7 +704,7 @@ function PlayerView({ state, setState }) {
         <Card>
           {fixtures.length === 0 && (
             <div style={{ padding: 16, color: T.sub, fontSize: 14 }}>
-              No group fixtures left for these teams. Knockout fixtures appear once the bracket is set.
+              No upcoming fixtures for these teams.
             </div>
           )}
           {fixtures.map((f, i) => {
@@ -725,7 +725,7 @@ function PlayerView({ state, setState }) {
                     {isFixtureOpen ? <ChevronUp size={14} color={T.sub} /> : <ChevronDown size={14} color={T.sub} />}
                   </div>
                   <div style={{ fontSize: 11, color: T.sub, marginTop: 2 }}>
-                    {f.city} · kickoff {localKickoff(f)}
+                    {f.city ? `${f.city} · ` : ""}{STAGE2LABEL[f.stage] ? `${STAGE2LABEL[f.stage]} · ` : ""}kickoff {localKickoff(f)}
                   </div>
                 </button>
                 {isFixtureOpen && (
