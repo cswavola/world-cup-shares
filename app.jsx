@@ -48,19 +48,22 @@ function RaceChart({ data, players, milestones = [] }) {
   );
 }
 
-function DistBars({ rows }) {
+function DistBars({ rows, elim = new Set() }) {
   const max = Math.max(0.01, ...rows.map((r) => r.points));
   return (
     <div className="flex flex-col gap-1" style={{ padding: "0 12px" }}>
-      {rows.map((r) => (
-        <div key={r.team} className="flex items-center gap-2" style={{ fontSize: 12 }}>
-          <span style={{ fontFamily: MONO, width: 34, color: T.sub }}>{r.team}</span>
-          <div style={{ flex: 1, background: T.soft, borderRadius: 4, height: 14, overflow: "hidden" }}>
-            <div style={{ width: `${(r.points / max) * 100}%`, background: T.green, height: "100%", borderRadius: 4, minWidth: r.points > 0 ? 2 : 0 }} />
+      {rows.map((r) => {
+        const isElim = elim.has(r.team);
+        return (
+          <div key={r.team} className="flex items-center gap-2" style={{ fontSize: 12, opacity: isElim ? 0.4 : 1 }}>
+            <span style={{ fontFamily: MONO, width: 34, color: T.sub }}>{r.team}</span>
+            <div style={{ flex: 1, background: T.soft, borderRadius: 4, height: 14, overflow: "hidden" }}>
+              <div style={{ width: `${(r.points / max) * 100}%`, background: isElim ? T.sub : T.green, height: "100%", borderRadius: 4, minWidth: r.points > 0 ? 2 : 0 }} />
+            </div>
+            <span style={{ fontFamily: MONO, width: 38, textAlign: "right", fontWeight: 700 }}>{fmt(r.points)}</span>
           </div>
-          <span style={{ fontFamily: MONO, width: 38, textAlign: "right", fontWeight: 700 }}>{fmt(r.points)}</span>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -316,6 +319,50 @@ function leaderboard(state) {
 
 const fmt = (x) => (Math.round(x * 100) / 100).toFixed(2);
 
+// A team is eliminated once they've played at least one game and have no upcoming fixtures.
+// "Upcoming" = unplayed group game OR unplayed knockout fixture (from the live bracket).
+// Knockout winners are kept active even before the next bracket is published.
+// SF losers are kept active until the third-place match is played.
+function eliminatedTeams(state) {
+  const playedKeys = new Set(state.matches.map(m => [m.a, m.b].sort().join("-")));
+  const hasUpcoming = new Set();
+
+  // Unplayed group-stage fixtures (hardcoded schedule)
+  for (const f of FIXTURES) {
+    const key = [f.a, f.b].sort().join("-");
+    if (!playedKeys.has(key)) { hasUpcoming.add(f.a); hasUpcoming.add(f.b); }
+  }
+
+  // Unplayed knockout fixtures (live-feed bracket; skip unresolved placeholders)
+  for (const f of state.knockoutFixtures || []) {
+    if (!TEAM[f.a] || !TEAM[f.b]) continue;
+    const key = [f.a, f.b].sort().join("-");
+    if (!playedKeys.has(key)) { hasUpcoming.add(f.a); hasUpcoming.add(f.b); }
+  }
+
+  // Knockout winners stay active even before the next round's bracket is published.
+  // SF losers also stay active — they still have the third-place match.
+  for (const m of state.matches) {
+    if (m.stage === "group") continue;
+    if (m.outcome === "a") hasUpcoming.add(m.a);
+    else if (m.outcome === "b") hasUpcoming.add(m.b);
+    if (m.stage === "sf") {
+      if (m.outcome === "a") hasUpcoming.add(m.b);
+      else if (m.outcome === "b") hasUpcoming.add(m.a);
+    }
+  }
+
+  const playedTeams = new Set(
+    state.matches.flatMap(m => [m.a, m.b]).filter(code => TEAM[code])
+  );
+
+  const elim = new Set();
+  for (const t of TEAMS) {
+    if (playedTeams.has(t.code) && !hasUpcoming.has(t.code)) elim.add(t.code);
+  }
+  return elim;
+}
+
 // The exact match after which each team's group-stage advancement became certain.
 // Keyed by "date+a+b" matching the openfootball feed order (same as FIXTURES).
 // null = best-third-place team whose certainty depended on all groups finishing.
@@ -514,6 +561,7 @@ function Leaderboard({ state }) {
   const board = useMemo(() => leaderboard(state), [state]);
   const race = useMemo(() => pointsRace(state), [state]);
   const milestones = useMemo(() => raceChartMilestones(state), [state]);
+  const elim = useMemo(() => eliminatedTeams(state), [state]);
   return (
     <div className="flex flex-col gap-2">
       <div className="flex gap-1" style={{ background: T.soft, borderRadius: 10, padding: 3 }}>
@@ -565,7 +613,7 @@ function Leaderboard({ state }) {
                   <span style={{ color: T.sub, fontSize: 11, fontFamily: MONO }}>TEAM PTS</span>
                   <span style={{ color: T.sub, fontSize: 11, fontFamily: MONO }}>YOURS</span>
                   {p.rows.map((r) => (
-                    <FragmentRow key={r.code} r={r} />
+                    <FragmentRow key={r.code} r={r} elim={elim} />
                   ))}
                 </div>
               </div>
@@ -577,10 +625,11 @@ function Leaderboard({ state }) {
   );
 }
 
-function FragmentRow({ r }) {
+function FragmentRow({ r, elim = new Set() }) {
+  const isElim = elim.has(r.code);
   return (
     <>
-      <span>{TEAM[r.code].name}</span>
+      <span>{TEAM[r.code].name}{isElim ? " ❌" : ""}</span>
       <span style={{ fontFamily: MONO }}>{r.shares}/{r.pool}</span>
       <span style={{ fontFamily: MONO }}>{fmt(r.teamPts)}</span>
       <span style={{ fontFamily: MONO, fontWeight: 700, color: T.green }}>{fmt(r.payout)}</span>
@@ -594,6 +643,7 @@ function PlayerView({ state, setState }) {
   const [openFixture, setOpenFixture] = useState(null);
   const tp = useMemo(() => teamPoints(state), [state]);
   const tot = useMemo(() => totalShares(state), [state]);
+  const elim = useMemo(() => eliminatedTeams(state), [state]);
   const today = localToday();
   const fixtures = useMemo(() => {
     if (!sel) return [];
@@ -644,7 +694,7 @@ function PlayerView({ state, setState }) {
 
       <Card style={{ padding: "14px 0 8px" }}>
         <div style={{ fontWeight: 700, fontSize: 14, padding: "0 0 8px 14px" }}>Where the points come from</div>
-        <DistBars rows={dist} />
+        <DistBars rows={dist} elim={elim} />
       </Card>
 
       <div>
