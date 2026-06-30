@@ -55,12 +55,12 @@ function DistBars({ rows, elim = new Set() }) {
       {rows.map((r) => {
         const isElim = elim.has(r.team);
         return (
-          <div key={r.team} className="flex items-center gap-2" style={{ fontSize: 12, opacity: isElim ? 0.4 : 1 }}>
+          <div key={r.team} className="flex items-center gap-2" style={{ fontSize: 12 }}>
             <span style={{ fontFamily: MONO, width: 34, color: T.sub }}>{r.team}</span>
             <div style={{ flex: 1, background: T.soft, borderRadius: 4, height: 14, overflow: "hidden" }}>
-              <div style={{ width: `${(r.points / max) * 100}%`, background: isElim ? T.sub : T.green, height: "100%", borderRadius: 4, minWidth: r.points > 0 ? 2 : 0 }} />
+              <div style={{ width: `${(r.points / max) * 100}%`, background: T.green, height: "100%", borderRadius: 4, minWidth: r.points > 0 ? 2 : 0 }} />
             </div>
-            <span style={{ fontFamily: MONO, width: 38, textAlign: "right", fontWeight: 700 }}>{fmt(r.points)}</span>
+            <span style={{ fontFamily: MONO, width: 38, textAlign: "right", fontWeight: 700 }}>{fmt(r.points)}{isElim ? " ❌" : ""}</span>
           </div>
         );
       })}
@@ -563,10 +563,10 @@ function FragmentRow({ r, elim = new Set() }) {
   const isElim = elim.has(r.code);
   return (
     <>
-      <span style={{ color: isElim ? T.sub : T.ink }}>{TEAM[r.code].name}{isElim ? " ❌" : ""}</span>
-      <span style={{ fontFamily: MONO, color: isElim ? T.sub : T.ink }}>{r.shares}/{r.pool}</span>
-      <span style={{ fontFamily: MONO, color: isElim ? T.sub : T.ink }}>{fmt(r.teamPts)}</span>
-      <span style={{ fontFamily: MONO, fontWeight: 700, color: isElim ? T.sub : T.green }}>{fmt(r.payout)}</span>
+      <span>{TEAM[r.code].name}{isElim ? " ❌" : ""}</span>
+      <span style={{ fontFamily: MONO }}>{r.shares}/{r.pool}</span>
+      <span style={{ fontFamily: MONO }}>{fmt(r.teamPts)}</span>
+      <span style={{ fontFamily: MONO, fontWeight: 700, color: T.green }}>{fmt(r.payout)}</span>
     </>
   );
 }
