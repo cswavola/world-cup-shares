@@ -776,7 +776,7 @@ function PlayerView({ state, setState }) {
 
       <div>
         <div style={{ fontSize: 11, letterSpacing: 2, color: T.sub, fontWeight: 700, margin: "0 4px 6px" }}>
-          UPCOMING FIXTURES
+          FIXTURES &amp; RESULTS
         </div>
         <Card>
           {fixtures.length === 0 && (
@@ -784,12 +784,18 @@ function PlayerView({ state, setState }) {
               No upcoming fixtures for these teams.
             </div>
           )}
-          {fixtures.map((f, i) => {
+          {(() => {
+            const resultByKey = {};
+            for (const m of state.matches) resultByKey[[m.a, m.b].sort().join("-")] = m;
+            return fixtures.map((f, i) => {
             const fixtureKey = `${f.date}-${f.a}-${f.b}`;
             const isFixtureOpen = openFixture === fixtureKey;
             const teamA = TEAM[f.a], teamB = TEAM[f.b];
             const nameA = teamA?.name ?? f.a, nameB = teamB?.name ?? f.b;
             const stageLabel = f.stage ? STAGE2LABEL[f.stage] : null;
+            const match = resultByKey[[f.a, f.b].sort().join("-")];
+            const scoreStr = match?.score ? `${match.score[0]}–${match.score[1]}` : null;
+            const winnerCode = match ? (match.outcome === "a" ? f.a : match.outcome === "b" ? f.b : null) : null;
             return (
               <div key={i} style={{ borderTop: i ? `1px solid ${T.line}` : "none" }}>
                 <button
@@ -797,15 +803,23 @@ function PlayerView({ state, setState }) {
                   style={{ padding: "10px 12px", display: "block", width: "100%", background: "none", textAlign: "left" }}>
                   <div className="flex items-center gap-2">
                     <span style={{ fontSize: 14, flex: 1 }}>
+                      <span style={{ display: "inline-block", width: 16 }}>{winnerCode === f.a ? "⚽" : ""}</span>
                       <b style={{ color: sel.shares[f.a] ? T.green : T.ink }}>{nameA}</b>
                       <span style={{ color: T.sub }}> v </span>
                       <b style={{ color: sel.shares[f.b] ? T.green : T.ink }}>{nameB}</b>
+                      <span style={{ display: "inline-block", width: 16, marginLeft: 2 }}>{winnerCode === f.b ? "⚽" : ""}</span>
                     </span>
-                    <span style={{ fontFamily: MONO, fontSize: 11, color: T.sub }}>{fmtDate(localDateKey(f))}</span>
+                    <span style={{ fontFamily: MONO, fontSize: 12,
+                      color: match ? (match.outcome === "draw" ? T.sub : T.green) : T.sub,
+                      fontWeight: match ? 700 : 400 }}>
+                      {scoreStr || (match ? "Draw" : fmtDate(localDateKey(f)))}
+                    </span>
                     {isFixtureOpen ? <ChevronUp size={14} color={T.sub} /> : <ChevronDown size={14} color={T.sub} />}
                   </div>
                   <div style={{ fontSize: 11, color: T.sub, marginTop: 2 }}>
-                    {[f.city, stageLabel, `kickoff ${localKickoff(f)}`].filter(Boolean).join(" · ")}
+                    {match
+                      ? [(winnerCode ? `${TEAM[winnerCode]?.name ?? winnerCode} won` : "Draw"), f.city, stageLabel].filter(Boolean).join(" · ")
+                      : [f.city, stageLabel, `kickoff ${localKickoff(f)}`].filter(Boolean).join(" · ")}
                   </div>
                 </button>
                 {isFixtureOpen && (
@@ -820,7 +834,8 @@ function PlayerView({ state, setState }) {
                 )}
               </div>
             );
-          })}
+          });
+          })()}
         </Card>
       </div>
 
