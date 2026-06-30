@@ -647,11 +647,11 @@ function PlayerView({ state, setState }) {
   const today = localToday();
   const fixtures = useMemo(() => {
     if (!sel) return [];
-    return FIXTURES
+    return [...FIXTURES, ...(state.knockoutFixtures || [])]
       .filter((f) => localDateKey(f) >= today && (sel.shares[f.a] || sel.shares[f.b]))
       .sort((a, b) => (fixtureInstant(a) || 0) - (fixtureInstant(b) || 0))
       .slice(0, 14);
-  }, [sel, today]);
+  }, [sel, today, state.knockoutFixtures]);
 
   if (!sel)
     return <Card style={{ padding: 16, color: T.sub, fontSize: 14 }}>No players yet — add them in the Picks tab.</Card>;
@@ -704,7 +704,7 @@ function PlayerView({ state, setState }) {
         <Card>
           {fixtures.length === 0 && (
             <div style={{ padding: 16, color: T.sub, fontSize: 14 }}>
-              No group fixtures left for these teams. Knockout fixtures appear once the bracket is set.
+              No upcoming fixtures for these teams.
             </div>
           )}
           {fixtures.map((f, i) => {
@@ -717,21 +717,21 @@ function PlayerView({ state, setState }) {
                   style={{ padding: "10px 12px", display: "block", width: "100%", background: "none", textAlign: "left" }}>
                   <div className="flex items-center gap-2">
                     <span style={{ fontSize: 14, flex: 1 }}>
-                      <b style={{ color: sel.shares[f.a] ? T.green : T.ink }}>{TEAM[f.a].name}</b>
+                      <b style={{ color: sel.shares[f.a] ? T.green : T.ink }}>{TEAM[f.a]?.name ?? "TBD"}</b>
                       <span style={{ color: T.sub }}> v </span>
-                      <b style={{ color: sel.shares[f.b] ? T.green : T.ink }}>{TEAM[f.b].name}</b>
+                      <b style={{ color: sel.shares[f.b] ? T.green : T.ink }}>{TEAM[f.b]?.name ?? "TBD"}</b>
                     </span>
                     <span style={{ fontFamily: MONO, fontSize: 11, color: T.sub }}>{fmtDate(localDateKey(f))}</span>
                     {isFixtureOpen ? <ChevronUp size={14} color={T.sub} /> : <ChevronDown size={14} color={T.sub} />}
                   </div>
                   <div style={{ fontSize: 11, color: T.sub, marginTop: 2 }}>
-                    {f.city} · kickoff {localKickoff(f)}
+                    {f.city ? `${f.city} · ` : ""}{STAGE2LABEL[f.stage] ? `${STAGE2LABEL[f.stage]} · ` : ""}kickoff {localKickoff(f)}
                   </div>
                 </button>
                 {isFixtureOpen && (
                   <div style={{ padding: "0 12px 12px", borderTop: `1px solid ${T.soft}`, display: "flex", flexDirection: "column", gap: 14 }}>
-                    <TeamOwnershipPanel code={f.a} state={state} tp={tp} tot={tot} />
-                    <TeamOwnershipPanel code={f.b} state={state} tp={tp} tot={tot} />
+                    {TEAM[f.a] ? <TeamOwnershipPanel code={f.a} state={state} tp={tp} tot={tot} /> : <div style={{ fontSize: 12, color: T.sub, fontStyle: "italic" }}>TBD</div>}
+                    {TEAM[f.b] ? <TeamOwnershipPanel code={f.b} state={state} tp={tp} tot={tot} /> : <div style={{ fontSize: 12, color: T.sub, fontStyle: "italic" }}>TBD</div>}
                   </div>
                 )}
               </div>
