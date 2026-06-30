@@ -597,10 +597,15 @@ function PlayerView({ state, setState }) {
   const elim = useMemo(() => eliminatedTeams(state), [state]);
   const raceData = useMemo(() => sel ? playerTeamRaceData(state, sel.shares) : null, [state, sel]);
   const today = localToday();
+  const yesterday = (() => {
+    const d = /* @__PURE__ */ new Date();
+    d.setDate(d.getDate() - 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  })();
   const fixtures = useMemo(() => {
     if (!sel) return [];
-    return [...FIXTURES, ...state.knockoutFixtures || []].filter((f) => localDateKey(f) >= today && (sel.shares[f.a] || sel.shares[f.b])).sort((a, b) => (fixtureInstant(a) || 0) - (fixtureInstant(b) || 0)).slice(0, 14);
-  }, [sel, today, state.knockoutFixtures]);
+    return [...FIXTURES, ...state.knockoutFixtures || []].filter((f) => localDateKey(f) >= yesterday && (sel.shares[f.a] || sel.shares[f.b])).sort((a, b) => (fixtureInstant(a) || 0) - (fixtureInstant(b) || 0)).slice(0, 14);
+  }, [sel, yesterday, state.knockoutFixtures]);
   if (!sel)
     return /* @__PURE__ */ React.createElement(Card, { style: { padding: 16, color: T.sub, fontSize: 14 } }, "No players yet \u2014 add them in the Picks tab.");
   const rank = board.findIndex((p) => p.id === sel.id) + 1;
