@@ -1,4 +1,65 @@
 const { useState, useEffect, useMemo, useRef } = React;
+function playerTeamRaceData(state, playerShares) {
+  const tot = totalShares(state);
+  const teams = Object.keys(playerShares).filter((k) => (playerShares[k] || 0) > 0);
+  if (!teams.length) return null;
+  const chron = [...state.matches || []].sort(
+    (a, b) => (a.date || "") < (b.date || "") ? -1 : (a.date || "") > (b.date || "") ? 1 : 0
+  );
+  const advanced = new Set(state.advanced || []);
+  const BUCKET_DEFS = [
+    { label: "MD1", test: (m) => m.stage === "group" && (m.date || "") <= "2026-06-17" },
+    { label: "MD2", test: (m) => m.stage === "group" && (m.date || "") > "2026-06-17" && (m.date || "") <= "2026-06-23" },
+    { label: "MD3", test: (m) => m.stage === "group" && (m.date || "") > "2026-06-23" },
+    { label: "R32", test: (m) => m.stage === "r32" },
+    { label: "R16", test: (m) => m.stage === "r16" },
+    { label: "QF", test: (m) => m.stage === "qf" },
+    { label: "SF", test: (m) => m.stage === "sf" },
+    { label: "Final", test: (m) => m.stage === "final" || m.stage === "third" }
+  ];
+  const tp = Object.fromEntries(teams.map((c) => [c, 0]));
+  const snap = () => Object.fromEntries(teams.map((c) => [c, tp[c]]));
+  const checkpoints = [{ label: "\xB7", pts: snap() }];
+  const teamLastCp = Object.fromEntries(teams.map((c) => [c, 0]));
+  for (const bd of BUCKET_DEFS) {
+    const bMatches = chron.filter(bd.test);
+    if (bMatches.length === 0) continue;
+    for (const m of bMatches) {
+      const s = STAGE[m.stage];
+      if (!s) continue;
+      for (const code of teams) {
+        if (m.a !== code && m.b !== code) continue;
+        if (m.outcome === "draw" && s.draw != null) tp[code] += s.draw;
+        else if (m.outcome === "a" && m.a === code) tp[code] += s.win;
+        else if (m.outcome === "b" && m.b === code) tp[code] += s.win;
+      }
+    }
+    if (bd.label === "MD3") {
+      for (const code of teams) {
+        if (advanced.has(code)) tp[code] += 1;
+      }
+    }
+    const cpIdx = checkpoints.length;
+    checkpoints.push({ label: bd.label, pts: snap() });
+    for (const code of teams) {
+      if (bMatches.some((m) => m.a === code || m.b === code)) teamLastCp[code] = cpIdx;
+    }
+  }
+  const elim = eliminatedTeams(state);
+  const teamLines = teams.map((code, i) => {
+    const shares = playerShares[code];
+    const pool = tot[code] || shares;
+    const ratio = pool > 0 ? shares / pool : 0;
+    const endIdx = teamLastCp[code] + 1;
+    return {
+      code,
+      color: TEAM_FLAG_COLOR[code] || PLAYER_COLORS[i % 10],
+      eliminated: elim.has(code),
+      values: checkpoints.slice(0, endIdx).map((cp) => Math.round(cp.pts[code] * ratio * 1e3) / 1e3)
+    };
+  });
+  return { labels: checkpoints.map((c) => c.label), teamLines };
+}
 function RaceChart({ data, players, milestones = [] }) {
   const W = 320, H = 190, P = { l: 26, r: 8, t: 8, b: 16 };
   const n = data.length;
@@ -31,6 +92,41 @@ function DistBars({ rows, elim = /* @__PURE__ */ new Set() }) {
   return /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-1", style: { padding: "0 12px" } }, rows.map((r) => {
     const isElim = elim.has(r.team);
     return /* @__PURE__ */ React.createElement("div", { key: r.team, className: "flex items-center gap-2", style: { fontSize: 12, opacity: isElim ? 0.4 : 1 } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: MONO, width: 34, color: T.sub } }, r.team), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, background: T.soft, borderRadius: 4, height: 14, overflow: "hidden" } }, /* @__PURE__ */ React.createElement("div", { style: { width: `${r.points / max * 100}%`, background: isElim ? T.sub : T.green, height: "100%", borderRadius: 4, minWidth: r.points > 0 ? 2 : 0 } })), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: MONO, width: 38, textAlign: "right", fontWeight: 700 } }, fmt(r.points)));
+  }));
+}
+function TeamRaceChart({ data }) {
+  if (!data || !data.teamLines) return null;
+  const { labels, teamLines } = data;
+  const hasLines = teamLines.some((l) => l.values.length >= 2);
+  if (!hasLines || labels.length < 2) {
+    return /* @__PURE__ */ React.createElement("div", { style: { padding: "12px 14px", color: T.sub, fontSize: 12 } }, "No results yet \u2014 chart fills in as matches are played.");
+  }
+  const W = 320, H = 180, P = { l: 28, r: 8, t: 8, b: 22 };
+  const n = labels.length;
+  const allVals = teamLines.flatMap((l) => l.values);
+  const maxV = Math.max(0.5, ...allVals);
+  const xPos = (i) => P.l + (n <= 1 ? 0 : i * (W - P.l - P.r) / (n - 1));
+  const yPos = (v) => H - P.b - v / maxV * (H - P.t - P.b);
+  const ticks = 4;
+  return /* @__PURE__ */ React.createElement("svg", { viewBox: `0 0 ${W} ${H}`, width: "100%", style: { display: "block" } }, Array.from({ length: ticks + 1 }, (_, k) => {
+    const v = maxV * k / ticks, yy = yPos(v);
+    return /* @__PURE__ */ React.createElement("g", { key: k }, /* @__PURE__ */ React.createElement("line", { x1: P.l, y1: yy, x2: W - P.r, y2: yy, stroke: T.line, strokeWidth: "1" }), /* @__PURE__ */ React.createElement("text", { x: P.l - 4, y: yy + 3, textAnchor: "end", fontSize: "7", fill: T.sub, fontFamily: MONO }, v.toFixed(1)));
+  }), labels.map((label, i) => /* @__PURE__ */ React.createElement("g", { key: i }, /* @__PURE__ */ React.createElement("line", { x1: xPos(i), y1: H - P.b, x2: xPos(i), y2: H - P.b + 3, stroke: T.sub, strokeWidth: "1", opacity: "0.4" }), /* @__PURE__ */ React.createElement("text", { x: xPos(i), y: H - 5, textAnchor: "middle", fontSize: "7", fill: T.sub, fontFamily: MONO }, label))), teamLines.map(({ code, color, eliminated, values }) => {
+    if (values.length < 2) return null;
+    const pts = values.map((v, i) => `${xPos(i)},${yPos(v)}`).join(" ");
+    const ex = xPos(values.length - 1), ey = yPos(values[values.length - 1]);
+    return /* @__PURE__ */ React.createElement("g", { key: code }, /* @__PURE__ */ React.createElement(
+      "polyline",
+      {
+        fill: "none",
+        stroke: color,
+        strokeWidth: "2",
+        strokeLinejoin: "round",
+        strokeLinecap: "round",
+        opacity: eliminated ? 0.55 : 1,
+        points: pts
+      }
+    ), eliminated ? /* @__PURE__ */ React.createElement("g", { stroke: color, strokeWidth: "2", strokeLinecap: "round", opacity: "0.7" }, /* @__PURE__ */ React.createElement("line", { x1: ex - 3, y1: ey - 3, x2: ex + 3, y2: ey + 3 }), /* @__PURE__ */ React.createElement("line", { x1: ex + 3, y1: ey - 3, x2: ex - 3, y2: ey + 3 })) : /* @__PURE__ */ React.createElement("circle", { cx: ex, cy: ey, r: "3", fill: color }));
   }));
 }
 const Svg = (p) => /* @__PURE__ */ React.createElement(
@@ -195,7 +291,7 @@ const FIXTURES = [
   ["2026-06-27", "17:00-4", "CRO", "GHA", "Philadelphia"]
 ].map(([date, time, a, b, city]) => ({ date, time, a, b, city }));
 function fixtureInstant(f) {
-  const m = /^(\d{1,2}):(\d{2})\s*(?:UTC\s*)?([+-]\d{1,2})(?::?(\d{2}))?$/.exec((f.time || "").trim());
+  const m = /^(\d{1,2}):(\d{2})\s*([+-]\d{1,2})(?::?(\d{2}))?$/.exec((f.time || "").trim());
   if (!m) return null;
   const [, hh, mm, offH, offM] = m;
   const sign = offH[0] === "-" ? "-" : "+";
@@ -236,6 +332,56 @@ const STAGES = [
 ];
 const STAGE = Object.fromEntries(STAGES.map((s) => [s.id, s]));
 const PLAYER_COLORS = ["#1F6B4A", "#E8A02E", "#FF1F8C", "#8B1A10", "#7A5BA6", "#00B4D8", "#F06010", "#5E7D2E", "#9A4D7E", "#54616B"];
+const TEAM_FLAG_COLOR = {
+  ALG: "#006233",
+  ARG: "#74ACDF",
+  AUS: "#FFB81C",
+  AUT: "#ED2939",
+  BEL: "#F9C900",
+  BIH: "#002395",
+  BRA: "#FED100",
+  CAN: "#FF0000",
+  CIV: "#F77F00",
+  COD: "#007FFF",
+  COL: "#FCD116",
+  CPV: "#003893",
+  CRO: "#FF0000",
+  CUW: "#002B7F",
+  CZE: "#D7141A",
+  ECU: "#FFD100",
+  EGY: "#CE1126",
+  ENG: "#C8102E",
+  ESP: "#AA151B",
+  FRA: "#003189",
+  GER: "#333333",
+  GHA: "#006B3F",
+  HAI: "#00209F",
+  IRN: "#239F40",
+  IRQ: "#CE1126",
+  JOR: "#007A3D",
+  JPN: "#BC002D",
+  KOR: "#CD2E3A",
+  KSA: "#006C35",
+  MAR: "#006233",
+  MEX: "#006847",
+  NED: "#FF6600",
+  NOR: "#003F87",
+  NZL: "#00247D",
+  PAN: "#005EB8",
+  PAR: "#D52B1E",
+  POR: "#006600",
+  QAT: "#8D153A",
+  RSA: "#007A4D",
+  SCO: "#003F87",
+  SEN: "#00853F",
+  SUI: "#FF0000",
+  SWE: "#006AA7",
+  TUN: "#E70013",
+  TUR: "#E30A17",
+  URU: "#0038A8",
+  USA: "#002868",
+  UZB: "#1EB53A"
+};
 const DEMO = {
   demo: true,
   me: null,
@@ -325,98 +471,18 @@ function eliminatedTeams(state) {
       else if (m.outcome === "b") hasUpcoming.add(m.a);
     }
   }
-  const playedTeams = new Set(
-    state.matches.flatMap((m) => [m.a, m.b]).filter((code) => TEAM[code])
-  );
+  const playedTeams = new Set(state.matches.flatMap((m) => [m.a, m.b]).filter((code) => TEAM[code]));
   const elim = /* @__PURE__ */ new Set();
   for (const t of TEAMS) {
     if (playedTeams.has(t.code) && !hasUpcoming.has(t.code)) elim.add(t.code);
   }
   return elim;
 }
-const GS_CLINCH = {
-  // Group A
-  MEX: { date: "2026-06-18", a: "MEX", b: "KOR" },
-  // 6 pts after MD2, H2H covers any tie
-  RSA: { date: "2026-06-24", a: "RSA", b: "KOR" },
-  // won MD3 to finish 2nd
-  // Group B
-  SUI: { date: "2026-06-18", a: "SUI", b: "BIH" },
-  // 4 pts, H2H over BIH covers worst case
-  CAN: { date: "2026-06-18", a: "CAN", b: "QAT" },
-  // 4 pts, GD over BIH covers worst case
-  BIH: null,
-  // Group C
-  BRA: { date: "2026-06-24", a: "SCO", b: "BRA" },
-  // won MD3
-  MAR: { date: "2026-06-24", a: "MAR", b: "HAI" },
-  // won MD3
-  // Group D
-  USA: { date: "2026-06-19", a: "USA", b: "AUS" },
-  // 6 pts after MD2
-  AUS: { date: "2026-06-25", a: "PAR", b: "AUS" },
-  // drew MD3 to finish 2nd
-  PAR: null,
-  // Group E
-  GER: { date: "2026-06-20", a: "GER", b: "CIV" },
-  // 6 pts, H2H over CIV covers tie
-  CIV: { date: "2026-06-25", a: "CUW", b: "CIV" },
-  // won MD3
-  ECU: null,
-  // Group F — NED not safe after MD2 (GD/goals-scored tie-break could go wrong)
-  NED: { date: "2026-06-25", a: "TUN", b: "NED" },
-  // won MD3
-  JPN: { date: "2026-06-25", a: "JPN", b: "SWE" },
-  // drew MD3 → 5 pts
-  SWE: null,
-  // Group G
-  BEL: { date: "2026-06-26", a: "NZL", b: "BEL" },
-  // won MD3
-  EGY: { date: "2026-06-26", a: "EGY", b: "IRN" },
-  // drew MD3 → 5 pts
-  // Group H
-  ESP: { date: "2026-06-26", a: "URU", b: "ESP" },
-  // won MD3
-  CPV: { date: "2026-06-26", a: "CPV", b: "KSA" },
-  // drew MD3 → 3 pts, URU also drew/lost
-  // Group I
-  FRA: { date: "2026-06-22", a: "FRA", b: "IRQ" },
-  // 6 pts after MD2, unreachable
-  NOR: { date: "2026-06-22", a: "NOR", b: "SEN" },
-  // 6 pts after MD2, unreachable
-  SEN: null,
-  // Group J
-  ARG: { date: "2026-06-22", a: "ARG", b: "AUT" },
-  // 6 pts after MD2
-  AUT: { date: "2026-06-27", a: "ALG", b: "AUT" },
-  // drew MD3 → 4 pts, runner-up on GD
-  ALG: null,
-  // Group K
-  COL: { date: "2026-06-23", a: "COL", b: "COD" },
-  // 6 pts after MD2
-  POR: { date: "2026-06-23", a: "POR", b: "UZB" },
-  // 4 pts, GD over COD covers worst case
-  COD: null,
-  // Group L
-  ENG: { date: "2026-06-27", a: "PAN", b: "ENG" },
-  // won MD3
-  CRO: { date: "2026-06-27", a: "CRO", b: "GHA" },
-  // won MD3 → 6 pts
-  GHA: null
-};
 function pointsRace(state) {
   const chron = [...state.matches].sort((x, y) => (x.date || "") < (y.date || "") ? -1 : 1);
   const tot = totalShares(state);
   const tp = Object.fromEntries(TEAMS.map((t) => [t.code, 0]));
-  const advancedSet = new Set(state.advanced);
-  const matchClinch = {};
-  for (const [code, clinch] of Object.entries(GS_CLINCH)) {
-    if (!advancedSet.has(code) || !clinch) continue;
-    const key = `${clinch.date}${clinch.a}${clinch.b}`;
-    (matchClinch[key] ||= []).push(code);
-  }
-  const bestThird = state.advanced.filter((code) => !GS_CLINCH[code]);
-  const lastGroupIdx = chron.reduce((last, m, i) => m.stage === "group" ? i : last, -1);
+  for (const code of state.advanced) tp[code] += 1;
   const snap = (label) => {
     const row = { label };
     for (const p of state.players) {
@@ -436,10 +502,6 @@ function pointsRace(state) {
         tp[m.b] += s.draw;
       } else if (m.outcome === "a") tp[m.a] += s.win;
       else if (m.outcome === "b") tp[m.b] += s.win;
-    }
-    for (const code of matchClinch[`${m.date}${m.a}${m.b}`] || []) tp[code] += 1;
-    if (i === lastGroupIdx) {
-      for (const code of bestThird) tp[code] += 1;
     }
     data.push(snap(String(i + 1)));
   });
@@ -488,7 +550,6 @@ function Leaderboard({ state }) {
   const board = useMemo(() => leaderboard(state), [state]);
   const race = useMemo(() => pointsRace(state), [state]);
   const milestones = useMemo(() => raceChartMilestones(state), [state]);
-  const elim = useMemo(() => eliminatedTeams(state), [state]);
   return /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-2" }, /* @__PURE__ */ React.createElement("div", { className: "flex gap-1", style: { background: T.soft, borderRadius: 10, padding: 3 } }, [["table", "Table"], ["race", "Race"]].map(([id, label]) => /* @__PURE__ */ React.createElement(
     "button",
     {
@@ -521,12 +582,11 @@ function Leaderboard({ state }) {
       i === 0 && p.total > 0 && /* @__PURE__ */ React.createElement(Trophy, { size: 16, color: T.gold }),
       /* @__PURE__ */ React.createElement("span", { style: { fontFamily: MONO, fontWeight: 700, fontSize: 17 } }, fmt(p.total)),
       isOpen ? /* @__PURE__ */ React.createElement(ChevronUp, { size: 16, color: T.sub }) : /* @__PURE__ */ React.createElement(ChevronDown, { size: 16, color: T.sub })
-    ), isOpen && /* @__PURE__ */ React.createElement("div", { style: { borderTop: `1px solid ${T.line}`, padding: "8px 12px 12px" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr auto auto auto", gap: "4px 12px", fontSize: 13 } }, /* @__PURE__ */ React.createElement("span", { style: { color: T.sub, fontSize: 11 } }, "TEAM"), /* @__PURE__ */ React.createElement("span", { style: { color: T.sub, fontSize: 11, fontFamily: MONO } }, "OWN"), /* @__PURE__ */ React.createElement("span", { style: { color: T.sub, fontSize: 11, fontFamily: MONO } }, "TEAM PTS"), /* @__PURE__ */ React.createElement("span", { style: { color: T.sub, fontSize: 11, fontFamily: MONO } }, "YOURS"), p.rows.map((r) => /* @__PURE__ */ React.createElement(FragmentRow, { key: r.code, r, elim })))));
+    ), isOpen && /* @__PURE__ */ React.createElement("div", { style: { borderTop: `1px solid ${T.line}`, padding: "8px 12px 12px" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr auto auto auto", gap: "4px 12px", fontSize: 13 } }, /* @__PURE__ */ React.createElement("span", { style: { color: T.sub, fontSize: 11 } }, "TEAM"), /* @__PURE__ */ React.createElement("span", { style: { color: T.sub, fontSize: 11, fontFamily: MONO } }, "OWN"), /* @__PURE__ */ React.createElement("span", { style: { color: T.sub, fontSize: 11, fontFamily: MONO } }, "TEAM PTS"), /* @__PURE__ */ React.createElement("span", { style: { color: T.sub, fontSize: 11, fontFamily: MONO } }, "YOURS"), p.rows.map((r) => /* @__PURE__ */ React.createElement(FragmentRow, { key: r.code, r })))));
   }));
 }
-function FragmentRow({ r, elim = /* @__PURE__ */ new Set() }) {
-  const isElim = elim.has(r.code);
-  return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("span", null, TEAM[r.code].name, isElim ? " \u274C" : ""), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: MONO } }, r.shares, "/", r.pool), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: MONO } }, fmt(r.teamPts)), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: MONO, fontWeight: 700, color: T.green } }, fmt(r.payout)));
+function FragmentRow({ r }) {
+  return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("span", null, TEAM[r.code].name), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: MONO } }, r.shares, "/", r.pool), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: MONO } }, fmt(r.teamPts)), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: MONO, fontWeight: 700, color: T.green } }, fmt(r.payout)));
 }
 function PlayerView({ state, setState }) {
   const board = useMemo(() => leaderboard(state), [state]);
@@ -535,6 +595,7 @@ function PlayerView({ state, setState }) {
   const tp = useMemo(() => teamPoints(state), [state]);
   const tot = useMemo(() => totalShares(state), [state]);
   const elim = useMemo(() => eliminatedTeams(state), [state]);
+  const raceData = useMemo(() => sel ? playerTeamRaceData(state, sel.shares) : null, [state, sel]);
   const today = localToday();
   const fixtures = useMemo(() => {
     if (!sel) return [];
@@ -568,19 +629,22 @@ function PlayerView({ state, setState }) {
       /* @__PURE__ */ React.createElement("span", { style: { display: "inline-block", width: 8, height: 8, borderRadius: 4, background: PLAYER_COLORS[i % 10], marginRight: 6 } }),
       p.name
     );
-  })), /* @__PURE__ */ React.createElement(Card, { style: { padding: 14 } }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2" }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 18, fontWeight: 800 } }, sel.name), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: T.sub } }, "#", rank, " of ", board.length, " \xB7 ", sel.rows.length, " teams")), /* @__PURE__ */ React.createElement("div", { style: { textAlign: "right" } }, /* @__PURE__ */ React.createElement("div", { style: { fontFamily: MONO, fontSize: 24, fontWeight: 800, color: T.green } }, fmt(sel.total)), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: T.sub } }, "points")))), /* @__PURE__ */ React.createElement(Card, { style: { padding: "14px 0 8px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 700, fontSize: 14, padding: "0 0 8px 14px" } }, "Where the points come from"), /* @__PURE__ */ React.createElement(DistBars, { rows: dist, elim })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, letterSpacing: 2, color: T.sub, fontWeight: 700, margin: "0 4px 6px" } }, "UPCOMING FIXTURES"), /* @__PURE__ */ React.createElement(Card, null, fixtures.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { padding: 16, color: T.sub, fontSize: 14 } }, "No upcoming fixtures for these teams."), fixtures.map((f, i) => {
+  })), /* @__PURE__ */ React.createElement(Card, { style: { padding: 14 } }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2" }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 18, fontWeight: 800 } }, sel.name), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: T.sub } }, "#", rank, " of ", board.length, " \xB7 ", sel.rows.length, " teams")), /* @__PURE__ */ React.createElement("div", { style: { textAlign: "right" } }, /* @__PURE__ */ React.createElement("div", { style: { fontFamily: MONO, fontSize: 24, fontWeight: 800, color: T.green } }, fmt(sel.total)), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: T.sub } }, "points")))), /* @__PURE__ */ React.createElement(Card, { style: { padding: "14px 0 10px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 700, fontSize: 14, padding: "0 0 8px 14px" } }, "Where the points come from"), /* @__PURE__ */ React.createElement(DistBars, { rows: dist, elim })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, letterSpacing: 2, color: T.sub, fontWeight: 700, margin: "0 4px 6px" } }, "UPCOMING FIXTURES"), /* @__PURE__ */ React.createElement(Card, null, fixtures.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { padding: 16, color: T.sub, fontSize: 14 } }, "No upcoming fixtures for these teams."), fixtures.map((f, i) => {
     const fixtureKey = `${f.date}-${f.a}-${f.b}`;
     const isFixtureOpen = openFixture === fixtureKey;
+    const teamA = TEAM[f.a], teamB = TEAM[f.b];
+    const nameA = teamA?.name ?? f.a, nameB = teamB?.name ?? f.b;
+    const stageLabel = f.stage ? STAGE2LABEL[f.stage] : null;
     return /* @__PURE__ */ React.createElement("div", { key: i, style: { borderTop: i ? `1px solid ${T.line}` : "none" } }, /* @__PURE__ */ React.createElement(
       "button",
       {
         onClick: () => setOpenFixture(isFixtureOpen ? null : fixtureKey),
         style: { padding: "10px 12px", display: "block", width: "100%", background: "none", textAlign: "left" }
       },
-      /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2" }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, flex: 1 } }, /* @__PURE__ */ React.createElement("b", { style: { color: sel.shares[f.a] ? T.green : T.ink } }, TEAM[f.a]?.name ?? "TBD"), /* @__PURE__ */ React.createElement("span", { style: { color: T.sub } }, " v "), /* @__PURE__ */ React.createElement("b", { style: { color: sel.shares[f.b] ? T.green : T.ink } }, TEAM[f.b]?.name ?? "TBD")), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: MONO, fontSize: 11, color: T.sub } }, fmtDate(localDateKey(f))), isFixtureOpen ? /* @__PURE__ */ React.createElement(ChevronUp, { size: 14, color: T.sub }) : /* @__PURE__ */ React.createElement(ChevronDown, { size: 14, color: T.sub })),
-      /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: T.sub, marginTop: 2 } }, f.city ? `${f.city} \xB7 ` : "", STAGE2LABEL[f.stage] ? `${STAGE2LABEL[f.stage]} \xB7 ` : "", "kickoff ", localKickoff(f))
-    ), isFixtureOpen && /* @__PURE__ */ React.createElement("div", { style: { padding: "0 12px 12px", borderTop: `1px solid ${T.soft}`, display: "flex", flexDirection: "column", gap: 14 } }, TEAM[f.a] ? /* @__PURE__ */ React.createElement(TeamOwnershipPanel, { code: f.a, state, tp, tot }) : /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: T.sub, fontStyle: "italic" } }, "TBD"), TEAM[f.b] ? /* @__PURE__ */ React.createElement(TeamOwnershipPanel, { code: f.b, state, tp, tot }) : /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: T.sub, fontStyle: "italic" } }, "TBD")));
-  }))));
+      /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2" }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, flex: 1 } }, /* @__PURE__ */ React.createElement("b", { style: { color: sel.shares[f.a] ? T.green : T.ink } }, nameA), /* @__PURE__ */ React.createElement("span", { style: { color: T.sub } }, " v "), /* @__PURE__ */ React.createElement("b", { style: { color: sel.shares[f.b] ? T.green : T.ink } }, nameB)), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: MONO, fontSize: 11, color: T.sub } }, fmtDate(localDateKey(f))), isFixtureOpen ? /* @__PURE__ */ React.createElement(ChevronUp, { size: 14, color: T.sub }) : /* @__PURE__ */ React.createElement(ChevronDown, { size: 14, color: T.sub })),
+      /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: T.sub, marginTop: 2 } }, [f.city, stageLabel, `kickoff ${localKickoff(f)}`].filter(Boolean).join(" \xB7 "))
+    ), isFixtureOpen && /* @__PURE__ */ React.createElement("div", { style: { padding: "0 12px 12px", borderTop: `1px solid ${T.soft}`, display: "flex", flexDirection: "column", gap: 14 } }, teamA ? /* @__PURE__ */ React.createElement(TeamOwnershipPanel, { code: f.a, state, tp, tot }) : /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: T.sub, fontStyle: "italic" } }, nameA, " \u2014 TBD"), teamB ? /* @__PURE__ */ React.createElement(TeamOwnershipPanel, { code: f.b, state, tp, tot }) : /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: T.sub, fontStyle: "italic" } }, nameB, " \u2014 TBD")));
+  }))), raceData && /* @__PURE__ */ React.createElement(Card, { style: { padding: "14px 4px 10px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 700, fontSize: 14, padding: "0 0 8px 10px" } }, "Points over time"), /* @__PURE__ */ React.createElement(TeamRaceChart, { data: raceData }), /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap gap-x-3 gap-y-1", style: { padding: "6px 12px 2px" } }, raceData.teamLines.map(({ code, color }) => /* @__PURE__ */ React.createElement("span", { key: code, style: { fontSize: 11, color: T.sub, display: "inline-flex", alignItems: "center", gap: 4 } }, /* @__PURE__ */ React.createElement("span", { style: { width: 8, height: 8, borderRadius: 4, background: color, flexShrink: 0 } }), TEAM[code]?.name ?? code)))));
 }
 const ROUND_ORDER = { group: 0, r32: 1, r16: 2, qf: 3, sf: 4, third: 5, final: 6 };
 const ROUND_LABEL = { final: "Final", third: "Third Place", sf: "Semi-final", qf: "Quarter-final", r16: "Round of 16", r32: "Round of 32", group: "Group Stage" };
@@ -1200,12 +1264,9 @@ function App() {
   const distributed = Object.values(teamPoints(eff)).reduce((a, b) => a + b, 0);
   const lastResult = merged.matches.length > 0 ? merged.matches.reduce((best, m) => m.date + (m.time || "") > best.date + (best.time || "") ? m : best) : null;
   const fmtResultDate = ({ date, time }) => {
-    const instant = time ? fixtureInstant({ date, time }) : null;
-    if (instant) {
-      return instant.toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false });
-    }
     const [, mo, dy] = date.split("-");
-    return `${["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][+mo - 1]} ${+dy}`;
+    const d = `${["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][+mo - 1]} ${+dy}`;
+    return time ? `${d} ${time}` : d;
   };
   const tabs = [
     ["board", "Standings", Trophy],
@@ -1215,7 +1276,7 @@ function App() {
     ["bingo", "Bingo", Grid],
     ["news", "News", Rss]
   ];
-  return /* @__PURE__ */ React.createElement("div", { style: { minHeight: "100vh", background: T.bg, color: T.ink, fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" } }, /* @__PURE__ */ React.createElement("header", { style: { background: T.greenDark, color: "#fff", padding: "18px 16px 14px", paddingTop: "calc(18px + env(safe-area-inset-top))" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 24, fontWeight: 900, letterSpacing: -0.5 } }, "WC26 ", /* @__PURE__ */ React.createElement("span", { style: { color: T.gold } }, "SHARES")), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, opacity: 0.85, fontFamily: MONO, marginTop: 2 } }, fmt(distributed), " pts distributed", /* @__PURE__ */ React.createElement("span", { style: { marginLeft: 8, opacity: 0.7 } }, feed === "loading" ? "\xB7 syncing\u2026" : feed === "fallback" ? "\xB7 offline (schedule only)" : lastResult ? `\xB7 updated ${fmtResultDate(lastResult)} \u2713` : "\xB7 live \u2713"))), /* @__PURE__ */ React.createElement("main", { style: { padding: 12, paddingBottom: 84, maxWidth: 560, margin: "0 auto" } }, tab === "board" && /* @__PURE__ */ React.createElement(Leaderboard, { state: eff }), tab === "me" && /* @__PURE__ */ React.createElement(PlayerView, { state: eff, setState }), tab === "teams" && /* @__PURE__ */ React.createElement(TeamsView, { state: eff }), tab === "fixtures" && /* @__PURE__ */ React.createElement(FixturesView, { state: eff }), tab === "bingo" && /* @__PURE__ */ React.createElement(BingoView, null), tab === "news" && /* @__PURE__ */ React.createElement(NewsfeedView, null)), /* @__PURE__ */ React.createElement("nav", { style: { position: "fixed", bottom: 0, left: 0, right: 0, background: T.card, borderTop: `1px solid ${T.line}`, display: "flex", paddingBottom: "env(safe-area-inset-bottom)" } }, tabs.map(([id, label, Icon]) => /* @__PURE__ */ React.createElement(
+  return /* @__PURE__ */ React.createElement("div", { style: { minHeight: "100vh", background: T.bg, color: T.ink, fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" } }, /* @__PURE__ */ React.createElement("header", { style: { background: T.greenDark, color: "#fff", padding: "18px 16px 14px", paddingTop: "calc(18px + env(safe-area-inset-top))" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 24, fontWeight: 900, letterSpacing: -0.5 } }, "WC26 ", /* @__PURE__ */ React.createElement("span", { style: { color: T.gold } }, "SHARES")), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, opacity: 0.85, fontFamily: MONO, marginTop: 2 } }, state.players.length, " players \xB7 max 4 shares per team \xB7 ", fmt(distributed), " pts distributed", /* @__PURE__ */ React.createElement("span", { style: { marginLeft: 8, opacity: 0.7 } }, feed === "loading" ? "\xB7 syncing\u2026" : feed === "fallback" ? "\xB7 offline (schedule only)" : lastResult ? `\xB7 updated ${fmtResultDate(lastResult)} \u2713` : "\xB7 live \u2713"))), /* @__PURE__ */ React.createElement("main", { style: { padding: 12, paddingBottom: 84, maxWidth: 560, margin: "0 auto" } }, tab === "board" && /* @__PURE__ */ React.createElement(Leaderboard, { state: eff }), tab === "me" && /* @__PURE__ */ React.createElement(PlayerView, { state: eff, setState }), tab === "teams" && /* @__PURE__ */ React.createElement(TeamsView, { state: eff }), tab === "fixtures" && /* @__PURE__ */ React.createElement(FixturesView, { state: eff }), tab === "bingo" && /* @__PURE__ */ React.createElement(BingoView, null), tab === "news" && /* @__PURE__ */ React.createElement(NewsfeedView, null)), /* @__PURE__ */ React.createElement("nav", { style: { position: "fixed", bottom: 0, left: 0, right: 0, background: T.card, borderTop: `1px solid ${T.line}`, display: "flex", paddingBottom: "env(safe-area-inset-bottom)" } }, tabs.map(([id, label, Icon]) => /* @__PURE__ */ React.createElement(
     "button",
     {
       key: id,

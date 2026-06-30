@@ -10,6 +10,81 @@
 const { useState, useEffect, useMemo, useRef } = React;
 
 
+/* ---- per-team staged points race, used in PlayerView ---- */
+// Returns checkpoint labels and one line per team (payout, not raw pts).
+// Each team's line stops at the last stage where they played a match.
+function playerTeamRaceData(state, playerShares) {
+  const tot = totalShares(state);
+  const teams = Object.keys(playerShares).filter((k) => (playerShares[k] || 0) > 0);
+  if (!teams.length) return null;
+
+  const chron = [...(state.matches || [])].sort((a, b) =>
+    (a.date || "") < (b.date || "") ? -1 : (a.date || "") > (b.date || "") ? 1 : 0
+  );
+  const advanced = new Set(state.advanced || []);
+
+  const BUCKET_DEFS = [
+    { label: "MD1",   test: (m) => m.stage === "group" && (m.date || "") <= "2026-06-17" },
+    { label: "MD2",   test: (m) => m.stage === "group" && (m.date || "") > "2026-06-17" && (m.date || "") <= "2026-06-23" },
+    { label: "MD3",   test: (m) => m.stage === "group" && (m.date || "") > "2026-06-23" },
+    { label: "R32",   test: (m) => m.stage === "r32" },
+    { label: "R16",   test: (m) => m.stage === "r16" },
+    { label: "QF",    test: (m) => m.stage === "qf" },
+    { label: "SF",    test: (m) => m.stage === "sf" },
+    { label: "Final", test: (m) => m.stage === "final" || m.stage === "third" },
+  ];
+
+  const tp = Object.fromEntries(teams.map((c) => [c, 0]));
+  const snap = () => Object.fromEntries(teams.map((c) => [c, tp[c]]));
+
+  const checkpoints = [{ label: "·", pts: snap() }];
+  const teamLastCp = Object.fromEntries(teams.map((c) => [c, 0]));
+
+  for (const bd of BUCKET_DEFS) {
+    const bMatches = chron.filter(bd.test);
+    if (bMatches.length === 0) continue;
+
+    for (const m of bMatches) {
+      const s = STAGE[m.stage];
+      if (!s) continue;
+      for (const code of teams) {
+        if (m.a !== code && m.b !== code) continue;
+        if (m.outcome === "draw" && s.draw != null) tp[code] += s.draw;
+        else if (m.outcome === "a" && m.a === code) tp[code] += s.win;
+        else if (m.outcome === "b" && m.b === code) tp[code] += s.win;
+      }
+    }
+    // Advancement-to-knockout bonus (+1) is credited at end of MD3
+    if (bd.label === "MD3") {
+      for (const code of teams) { if (advanced.has(code)) tp[code] += 1; }
+    }
+
+    const cpIdx = checkpoints.length;
+    checkpoints.push({ label: bd.label, pts: snap() });
+
+    for (const code of teams) {
+      if (bMatches.some((m) => m.a === code || m.b === code)) teamLastCp[code] = cpIdx;
+    }
+  }
+
+  const elim = eliminatedTeams(state);
+
+  const teamLines = teams.map((code, i) => {
+    const shares = playerShares[code];
+    const pool = tot[code] || shares;
+    const ratio = pool > 0 ? shares / pool : 0;
+    const endIdx = teamLastCp[code] + 1;
+    return {
+      code,
+      color: TEAM_FLAG_COLOR[code] || PLAYER_COLORS[i % 10],
+      eliminated: elim.has(code),
+      values: checkpoints.slice(0, endIdx).map((cp) => Math.round(cp.pts[code] * ratio * 1000) / 1000),
+    };
+  });
+
+  return { labels: checkpoints.map((c) => c.label), teamLines };
+}
+
 /* ---- charts, drawn in plain SVG (no chart library) ---- */
 function RaceChart({ data, players, milestones = [] }) {
   const W = 320, H = 190, P = { l: 26, r: 8, t: 8, b: 16 };
@@ -65,6 +140,69 @@ function DistBars({ rows, elim = new Set() }) {
         );
       })}
     </div>
+  );
+}
+
+function TeamRaceChart({ data }) {
+  if (!data || !data.teamLines) return null;
+  const { labels, teamLines } = data;
+  const hasLines = teamLines.some((l) => l.values.length >= 2);
+  if (!hasLines || labels.length < 2) {
+    return (
+      <div style={{ padding: "12px 14px", color: T.sub, fontSize: 12 }}>
+        No results yet — chart fills in as matches are played.
+      </div>
+    );
+  }
+
+  const W = 320, H = 180, P = { l: 28, r: 8, t: 8, b: 22 };
+  const n = labels.length;
+  const allVals = teamLines.flatMap((l) => l.values);
+  const maxV = Math.max(0.5, ...allVals);
+  const xPos = (i) => P.l + (n <= 1 ? 0 : (i * (W - P.l - P.r)) / (n - 1));
+  const yPos = (v) => H - P.b - (v / maxV) * (H - P.t - P.b);
+  const ticks = 4;
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: "block" }}>
+      {Array.from({ length: ticks + 1 }, (_, k) => {
+        const v = (maxV * k) / ticks, yy = yPos(v);
+        return (
+          <g key={k}>
+            <line x1={P.l} y1={yy} x2={W - P.r} y2={yy} stroke={T.line} strokeWidth="1" />
+            <text x={P.l - 4} y={yy + 3} textAnchor="end" fontSize="7" fill={T.sub} fontFamily={MONO}>
+              {v.toFixed(1)}
+            </text>
+          </g>
+        );
+      })}
+      {labels.map((label, i) => (
+        <g key={i}>
+          <line x1={xPos(i)} y1={H - P.b} x2={xPos(i)} y2={H - P.b + 3} stroke={T.sub} strokeWidth="1" opacity="0.4" />
+          <text x={xPos(i)} y={H - 5} textAnchor="middle" fontSize="7" fill={T.sub} fontFamily={MONO}>{label}</text>
+        </g>
+      ))}
+      {teamLines.map(({ code, color, eliminated, values }) => {
+        if (values.length < 2) return null;
+        const pts = values.map((v, i) => `${xPos(i)},${yPos(v)}`).join(" ");
+        const ex = xPos(values.length - 1), ey = yPos(values[values.length - 1]);
+        return (
+          <g key={code}>
+            <polyline fill="none" stroke={color} strokeWidth="2"
+              strokeLinejoin="round" strokeLinecap="round"
+              opacity={eliminated ? 0.55 : 1} points={pts} />
+            {eliminated ? (
+              <g stroke={color} strokeWidth="2" strokeLinecap="round" opacity="0.7">
+                <line x1={ex - 3} y1={ey - 3} x2={ex + 3} y2={ey + 3} />
+                <line x1={ex + 3} y1={ey - 3} x2={ex - 3} y2={ey + 3} />
+              </g>
+            ) : (
+              <circle cx={ex} cy={ey} r="3" fill={color} />
+            )}
+          </g>
+        );
+      })}
+    </svg>
   );
 }
 
@@ -193,7 +331,7 @@ const FIXTURES = [
 // the absolute instant, then render it in whatever timezone the viewer's device
 // is set to — so everyone sees kickoffs in their own time rather than the venue's.
 function fixtureInstant(f) {
-  const m = /^(\d{1,2}):(\d{2})\s*(?:UTC\s*)?([+-]\d{1,2})(?::?(\d{2}))?$/.exec((f.time || "").trim());
+  const m = /^(\d{1,2}):(\d{2})\s*([+-]\d{1,2})(?::?(\d{2}))?$/.exec((f.time || "").trim());
   if (!m) return null;
   const [, hh, mm, offH, offM] = m;
   const sign = offH[0] === "-" ? "-" : "+";
@@ -249,6 +387,22 @@ const STAGES = [
 const STAGE = Object.fromEntries(STAGES.map((s) => [s.id, s]));
 
 const PLAYER_COLORS = ["#1F6B4A","#E8A02E","#FF1F8C","#8B1A10","#7A5BA6","#00B4D8","#F06010","#5E7D2E","#9A4D7E","#54616B"];
+
+// Loosely flag-inspired colors, one dominant hue per nation.
+const TEAM_FLAG_COLOR = {
+  ALG:"#006233", ARG:"#74ACDF", AUS:"#FFB81C", AUT:"#ED2939",
+  BEL:"#F9C900", BIH:"#002395", BRA:"#FED100", CAN:"#FF0000",
+  CIV:"#F77F00", COD:"#007FFF", COL:"#FCD116", CPV:"#003893",
+  CRO:"#FF0000", CUW:"#002B7F", CZE:"#D7141A", ECU:"#FFD100",
+  EGY:"#CE1126", ENG:"#C8102E", ESP:"#AA151B", FRA:"#003189",
+  GER:"#333333", GHA:"#006B3F", HAI:"#00209F", IRN:"#239F40",
+  IRQ:"#CE1126", JOR:"#007A3D", JPN:"#BC002D", KOR:"#CD2E3A",
+  KSA:"#006C35", MAR:"#006233", MEX:"#006847", NED:"#FF6600",
+  NOR:"#003F87", NZL:"#00247D", PAN:"#005EB8", PAR:"#D52B1E",
+  POR:"#006600", QAT:"#8D153A", RSA:"#007A4D", SCO:"#003F87",
+  SEN:"#00853F", SUI:"#FF0000", SWE:"#006AA7", TUN:"#E70013",
+  TUR:"#E30A17", URU:"#0038A8", USA:"#002868", UZB:"#1EB53A",
+};
 
 const DEMO = {
   demo: true,
@@ -326,22 +480,15 @@ const fmt = (x) => (Math.round(x * 100) / 100).toFixed(2);
 function eliminatedTeams(state) {
   const playedKeys = new Set(state.matches.map(m => [m.a, m.b].sort().join("-")));
   const hasUpcoming = new Set();
-
-  // Unplayed group-stage fixtures (hardcoded schedule)
   for (const f of FIXTURES) {
     const key = [f.a, f.b].sort().join("-");
     if (!playedKeys.has(key)) { hasUpcoming.add(f.a); hasUpcoming.add(f.b); }
   }
-
-  // Unplayed knockout fixtures (live-feed bracket; skip unresolved placeholders)
   for (const f of state.knockoutFixtures || []) {
     if (!TEAM[f.a] || !TEAM[f.b]) continue;
     const key = [f.a, f.b].sort().join("-");
     if (!playedKeys.has(key)) { hasUpcoming.add(f.a); hasUpcoming.add(f.b); }
   }
-
-  // Knockout winners stay active even before the next round's bracket is published.
-  // SF losers also stay active — they still have the third-place match.
   for (const m of state.matches) {
     if (m.stage === "group") continue;
     if (m.outcome === "a") hasUpcoming.add(m.a);
@@ -351,11 +498,7 @@ function eliminatedTeams(state) {
       else if (m.outcome === "b") hasUpcoming.add(m.a);
     }
   }
-
-  const playedTeams = new Set(
-    state.matches.flatMap(m => [m.a, m.b]).filter(code => TEAM[code])
-  );
-
+  const playedTeams = new Set(state.matches.flatMap(m => [m.a, m.b]).filter(code => TEAM[code]));
   const elim = new Set();
   for (const t of TEAMS) {
     if (playedTeams.has(t.code) && !hasUpcoming.has(t.code)) elim.add(t.code);
@@ -363,76 +506,14 @@ function eliminatedTeams(state) {
   return elim;
 }
 
-// The exact match after which each team's group-stage advancement became certain.
-// Keyed by "date+a+b" matching the openfootball feed order (same as FIXTURES).
-// null = best-third-place team whose certainty depended on all groups finishing.
-const GS_CLINCH = {
-  // Group A
-  MEX: { date: "2026-06-18", a: "MEX", b: "KOR" }, // 6 pts after MD2, H2H covers any tie
-  RSA: { date: "2026-06-24", a: "RSA", b: "KOR" }, // won MD3 to finish 2nd
-  // Group B
-  SUI: { date: "2026-06-18", a: "SUI", b: "BIH" }, // 4 pts, H2H over BIH covers worst case
-  CAN: { date: "2026-06-18", a: "CAN", b: "QAT" }, // 4 pts, GD over BIH covers worst case
-  BIH: null,
-  // Group C
-  BRA: { date: "2026-06-24", a: "SCO", b: "BRA" }, // won MD3
-  MAR: { date: "2026-06-24", a: "MAR", b: "HAI" }, // won MD3
-  // Group D
-  USA: { date: "2026-06-19", a: "USA", b: "AUS" }, // 6 pts after MD2
-  AUS: { date: "2026-06-25", a: "PAR", b: "AUS" }, // drew MD3 to finish 2nd
-  PAR: null,
-  // Group E
-  GER: { date: "2026-06-20", a: "GER", b: "CIV" }, // 6 pts, H2H over CIV covers tie
-  CIV: { date: "2026-06-25", a: "CUW", b: "CIV" }, // won MD3
-  ECU: null,
-  // Group F — NED not safe after MD2 (GD/goals-scored tie-break could go wrong)
-  NED: { date: "2026-06-25", a: "TUN", b: "NED" }, // won MD3
-  JPN: { date: "2026-06-25", a: "JPN", b: "SWE" }, // drew MD3 → 5 pts
-  SWE: null,
-  // Group G
-  BEL: { date: "2026-06-26", a: "NZL", b: "BEL" }, // won MD3
-  EGY: { date: "2026-06-26", a: "EGY", b: "IRN" }, // drew MD3 → 5 pts
-  // Group H
-  ESP: { date: "2026-06-26", a: "URU", b: "ESP" }, // won MD3
-  CPV: { date: "2026-06-26", a: "CPV", b: "KSA" }, // drew MD3 → 3 pts, URU also drew/lost
-  // Group I
-  FRA: { date: "2026-06-22", a: "FRA", b: "IRQ" }, // 6 pts after MD2, unreachable
-  NOR: { date: "2026-06-22", a: "NOR", b: "SEN" }, // 6 pts after MD2, unreachable
-  SEN: null,
-  // Group J
-  ARG: { date: "2026-06-22", a: "ARG", b: "AUT" }, // 6 pts after MD2
-  AUT: { date: "2026-06-27", a: "ALG", b: "AUT" }, // drew MD3 → 4 pts, runner-up on GD
-  ALG: null,
-  // Group K
-  COL: { date: "2026-06-23", a: "COL", b: "COD" }, // 6 pts after MD2
-  POR: { date: "2026-06-23", a: "POR", b: "UZB" }, // 4 pts, GD over COD covers worst case
-  COD: null,
-  // Group L
-  ENG: { date: "2026-06-27", a: "PAN", b: "ENG" }, // won MD3
-  CRO: { date: "2026-06-27", a: "CRO", b: "GHA" }, // won MD3 → 6 pts
-  GHA: null,
-};
-
 // Cumulative points after each result, for the race chart.
-// Advancement bonuses are applied exactly when each team's qualification became certain.
-// Best-third-place teams (null in GS_CLINCH) are credited after the last group match.
+// Qualification bonuses are treated as banked from the start so the
+// final data point always matches the standings total.
 function pointsRace(state) {
   const chron = [...state.matches].sort((x, y) => (x.date || "") < (y.date || "") ? -1 : 1);
   const tot = totalShares(state);
   const tp = Object.fromEntries(TEAMS.map((t) => [t.code, 0]));
-  const advancedSet = new Set(state.advanced);
-
-  // Build match-key → teams that clinch after it
-  const matchClinch = {};
-  for (const [code, clinch] of Object.entries(GS_CLINCH)) {
-    if (!advancedSet.has(code) || !clinch) continue;
-    const key = `${clinch.date}${clinch.a}${clinch.b}`;
-    (matchClinch[key] ||= []).push(code);
-  }
-  // Best-third teams: apply after the last group match in the timeline
-  const bestThird = state.advanced.filter((code) => !GS_CLINCH[code]);
-  const lastGroupIdx = chron.reduce((last, m, i) => m.stage === "group" ? i : last, -1);
-
+  for (const code of state.advanced) tp[code] += 1;
   const snap = (label) => {
     const row = { label };
     for (const p of state.players) {
@@ -450,10 +531,6 @@ function pointsRace(state) {
       if (m.outcome === "draw" && s.draw) { tp[m.a] += s.draw; tp[m.b] += s.draw; }
       else if (m.outcome === "a") tp[m.a] += s.win;
       else if (m.outcome === "b") tp[m.b] += s.win;
-    }
-    for (const code of (matchClinch[`${m.date}${m.a}${m.b}`] || [])) tp[code] += 1;
-    if (i === lastGroupIdx) {
-      for (const code of bestThird) tp[code] += 1;
     }
     data.push(snap(String(i + 1)));
   });
@@ -561,7 +638,6 @@ function Leaderboard({ state }) {
   const board = useMemo(() => leaderboard(state), [state]);
   const race = useMemo(() => pointsRace(state), [state]);
   const milestones = useMemo(() => raceChartMilestones(state), [state]);
-  const elim = useMemo(() => eliminatedTeams(state), [state]);
   return (
     <div className="flex flex-col gap-2">
       <div className="flex gap-1" style={{ background: T.soft, borderRadius: 10, padding: 3 }}>
@@ -613,7 +689,7 @@ function Leaderboard({ state }) {
                   <span style={{ color: T.sub, fontSize: 11, fontFamily: MONO }}>TEAM PTS</span>
                   <span style={{ color: T.sub, fontSize: 11, fontFamily: MONO }}>YOURS</span>
                   {p.rows.map((r) => (
-                    <FragmentRow key={r.code} r={r} elim={elim} />
+                    <FragmentRow key={r.code} r={r} />
                   ))}
                 </div>
               </div>
@@ -625,11 +701,10 @@ function Leaderboard({ state }) {
   );
 }
 
-function FragmentRow({ r, elim = new Set() }) {
-  const isElim = elim.has(r.code);
+function FragmentRow({ r }) {
   return (
     <>
-      <span>{TEAM[r.code].name}{isElim ? " ❌" : ""}</span>
+      <span>{TEAM[r.code].name}</span>
       <span style={{ fontFamily: MONO }}>{r.shares}/{r.pool}</span>
       <span style={{ fontFamily: MONO }}>{fmt(r.teamPts)}</span>
       <span style={{ fontFamily: MONO, fontWeight: 700, color: T.green }}>{fmt(r.payout)}</span>
@@ -644,6 +719,7 @@ function PlayerView({ state, setState }) {
   const tp = useMemo(() => teamPoints(state), [state]);
   const tot = useMemo(() => totalShares(state), [state]);
   const elim = useMemo(() => eliminatedTeams(state), [state]);
+  const raceData = useMemo(() => sel ? playerTeamRaceData(state, sel.shares) : null, [state, sel]);
   const today = localToday();
   const fixtures = useMemo(() => {
     if (!sel) return [];
@@ -692,7 +768,7 @@ function PlayerView({ state, setState }) {
         </div>
       </Card>
 
-      <Card style={{ padding: "14px 0 8px" }}>
+      <Card style={{ padding: "14px 0 10px" }}>
         <div style={{ fontWeight: 700, fontSize: 14, padding: "0 0 8px 14px" }}>Where the points come from</div>
         <DistBars rows={dist} elim={elim} />
       </Card>
@@ -710,6 +786,9 @@ function PlayerView({ state, setState }) {
           {fixtures.map((f, i) => {
             const fixtureKey = `${f.date}-${f.a}-${f.b}`;
             const isFixtureOpen = openFixture === fixtureKey;
+            const teamA = TEAM[f.a], teamB = TEAM[f.b];
+            const nameA = teamA?.name ?? f.a, nameB = teamB?.name ?? f.b;
+            const stageLabel = f.stage ? STAGE2LABEL[f.stage] : null;
             return (
               <div key={i} style={{ borderTop: i ? `1px solid ${T.line}` : "none" }}>
                 <button
@@ -717,21 +796,25 @@ function PlayerView({ state, setState }) {
                   style={{ padding: "10px 12px", display: "block", width: "100%", background: "none", textAlign: "left" }}>
                   <div className="flex items-center gap-2">
                     <span style={{ fontSize: 14, flex: 1 }}>
-                      <b style={{ color: sel.shares[f.a] ? T.green : T.ink }}>{TEAM[f.a]?.name ?? "TBD"}</b>
+                      <b style={{ color: sel.shares[f.a] ? T.green : T.ink }}>{nameA}</b>
                       <span style={{ color: T.sub }}> v </span>
-                      <b style={{ color: sel.shares[f.b] ? T.green : T.ink }}>{TEAM[f.b]?.name ?? "TBD"}</b>
+                      <b style={{ color: sel.shares[f.b] ? T.green : T.ink }}>{nameB}</b>
                     </span>
                     <span style={{ fontFamily: MONO, fontSize: 11, color: T.sub }}>{fmtDate(localDateKey(f))}</span>
                     {isFixtureOpen ? <ChevronUp size={14} color={T.sub} /> : <ChevronDown size={14} color={T.sub} />}
                   </div>
                   <div style={{ fontSize: 11, color: T.sub, marginTop: 2 }}>
-                    {f.city ? `${f.city} · ` : ""}{STAGE2LABEL[f.stage] ? `${STAGE2LABEL[f.stage]} · ` : ""}kickoff {localKickoff(f)}
+                    {[f.city, stageLabel, `kickoff ${localKickoff(f)}`].filter(Boolean).join(" · ")}
                   </div>
                 </button>
                 {isFixtureOpen && (
                   <div style={{ padding: "0 12px 12px", borderTop: `1px solid ${T.soft}`, display: "flex", flexDirection: "column", gap: 14 }}>
-                    {TEAM[f.a] ? <TeamOwnershipPanel code={f.a} state={state} tp={tp} tot={tot} /> : <div style={{ fontSize: 12, color: T.sub, fontStyle: "italic" }}>TBD</div>}
-                    {TEAM[f.b] ? <TeamOwnershipPanel code={f.b} state={state} tp={tp} tot={tot} /> : <div style={{ fontSize: 12, color: T.sub, fontStyle: "italic" }}>TBD</div>}
+                    {teamA
+                      ? <TeamOwnershipPanel code={f.a} state={state} tp={tp} tot={tot} />
+                      : <div style={{ fontSize: 12, color: T.sub, fontStyle: "italic" }}>{nameA} — TBD</div>}
+                    {teamB
+                      ? <TeamOwnershipPanel code={f.b} state={state} tp={tp} tot={tot} />
+                      : <div style={{ fontSize: 12, color: T.sub, fontStyle: "italic" }}>{nameB} — TBD</div>}
                   </div>
                 )}
               </div>
@@ -739,6 +822,21 @@ function PlayerView({ state, setState }) {
           })}
         </Card>
       </div>
+
+      {raceData && (
+        <Card style={{ padding: "14px 4px 10px" }}>
+          <div style={{ fontWeight: 700, fontSize: 14, padding: "0 0 8px 10px" }}>Points over time</div>
+          <TeamRaceChart data={raceData} />
+          <div className="flex flex-wrap gap-x-3 gap-y-1" style={{ padding: "6px 12px 2px" }}>
+            {raceData.teamLines.map(({ code, color }) => (
+              <span key={code} style={{ fontSize: 11, color: T.sub, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                <span style={{ width: 8, height: 8, borderRadius: 4, background: color, flexShrink: 0 }} />
+                {TEAM[code]?.name ?? code}
+              </span>
+            ))}
+          </div>
+        </Card>
+      )}
     </div>
   );
 }
@@ -1564,12 +1662,9 @@ function App() {
     ? merged.matches.reduce((best, m) => (m.date + (m.time || "") > best.date + (best.time || "") ? m : best))
     : null;
   const fmtResultDate = ({ date, time }) => {
-    const instant = time ? fixtureInstant({ date, time }) : null;
-    if (instant) {
-      return instant.toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false });
-    }
     const [, mo, dy] = date.split("-");
-    return `${["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][+mo-1]} ${+dy}`;
+    const d = `${["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][+mo-1]} ${+dy}`;
+    return time ? `${d} ${time}` : d;
   };
   const tabs = [
     ["board", "Standings", Trophy],
@@ -1587,7 +1682,7 @@ function App() {
           WC26 <span style={{ color: T.gold }}>SHARES</span>
         </div>
         <div style={{ fontSize: 12, opacity: 0.85, fontFamily: MONO, marginTop: 2 }}>
-          {fmt(distributed)} pts distributed
+          {state.players.length} players · max 4 shares per team · {fmt(distributed)} pts distributed
           <span style={{ marginLeft: 8, opacity: 0.7 }}>
             {feed === "loading" ? "· syncing…" : feed === "fallback" ? "· offline (schedule only)" : lastResult ? `· updated ${fmtResultDate(lastResult)} ✓` : "· live ✓"}
           </span>
