@@ -331,7 +331,7 @@ const FIXTURES = [
 // the absolute instant, then render it in whatever timezone the viewer's device
 // is set to — so everyone sees kickoffs in their own time rather than the venue's.
 function fixtureInstant(f) {
-  const m = /^(\d{1,2}):(\d{2})\s*([+-]\d{1,2})(?::?(\d{2}))?$/.exec((f.time || "").trim());
+  const m = /^(\d{1,2}):(\d{2})(?:\s+UTC)?\s*([+-]\d{1,2})(?::?(\d{2}))?$/.exec((f.time || "").trim());
   if (!m) return null;
   const [, hh, mm, offH, offM] = m;
   const sign = offH[0] === "-" ? "-" : "+";
@@ -805,11 +805,11 @@ function PlayerView({ state, setState }) {
                   style={{ padding: "10px 12px", display: "block", width: "100%", background: "none", textAlign: "left" }}>
                   <div className="flex items-center gap-2">
                     <span style={{ fontSize: 14, flex: 1 }}>
-                      <span style={{ display: "inline-block", width: 16 }}>{winnerCode === f.a ? "⚽" : ""}</span>
+                      <span style={{ display: "inline-block", width: 20 }}>{winnerCode === f.a ? "⚽" : ""}</span>
                       <b style={{ color: sel.shares[f.a] ? T.green : T.ink }}>{nameA}</b>
                       <span style={{ color: T.sub }}> v </span>
                       <b style={{ color: sel.shares[f.b] ? T.green : T.ink }}>{nameB}</b>
-                      <span style={{ display: "inline-block", width: 16, marginLeft: 2 }}>{winnerCode === f.b ? "⚽" : ""}</span>
+                      <span style={{ display: "inline-block", width: 20, marginLeft: 2 }}>{winnerCode === f.b ? "⚽" : ""}</span>
                     </span>
                     <span style={{ fontFamily: MONO, fontSize: 12,
                       color: match ? (match.outcome === "draw" ? T.sub : T.green) : T.sub,
@@ -818,7 +818,7 @@ function PlayerView({ state, setState }) {
                     </span>
                     {isFixtureOpen ? <ChevronUp size={14} color={T.sub} /> : <ChevronDown size={14} color={T.sub} />}
                   </div>
-                  <div style={{ fontSize: 11, color: T.sub, marginTop: 2 }}>
+                  <div style={{ fontSize: 11, color: T.sub, marginTop: 2, paddingLeft: 20 }}>
                     {match
                       ? [(winnerCode ? `${TEAM[winnerCode]?.name ?? winnerCode} won` : "Draw"), f.city, stageLabel].filter(Boolean).join(" · ")
                       : [f.city, stageLabel, `kickoff ${localKickoff(f)}`].filter(Boolean).join(" · ")}
