@@ -638,6 +638,7 @@ function Leaderboard({ state }) {
   const board = useMemo(() => leaderboard(state), [state]);
   const race = useMemo(() => pointsRace(state), [state]);
   const milestones = useMemo(() => raceChartMilestones(state), [state]);
+  const elim = useMemo(() => eliminatedTeams(state), [state]);
   return (
     <div className="flex flex-col gap-2">
       <div className="flex gap-1" style={{ background: T.soft, borderRadius: 10, padding: 3 }}>
@@ -689,7 +690,7 @@ function Leaderboard({ state }) {
                   <span style={{ color: T.sub, fontSize: 11, fontFamily: MONO }}>TEAM PTS</span>
                   <span style={{ color: T.sub, fontSize: 11, fontFamily: MONO }}>YOURS</span>
                   {p.rows.map((r) => (
-                    <FragmentRow key={r.code} r={r} />
+                    <FragmentRow key={r.code} r={r} elim={elim} />
                   ))}
                 </div>
               </div>
@@ -701,10 +702,11 @@ function Leaderboard({ state }) {
   );
 }
 
-function FragmentRow({ r }) {
+function FragmentRow({ r, elim = new Set() }) {
+  const isElim = elim.has(r.code);
   return (
     <>
-      <span>{TEAM[r.code].name}</span>
+      <span>{TEAM[r.code].name}{isElim ? " ❌" : ""}</span>
       <span style={{ fontFamily: MONO }}>{r.shares}/{r.pool}</span>
       <span style={{ fontFamily: MONO }}>{fmt(r.teamPts)}</span>
       <span style={{ fontFamily: MONO, fontWeight: 700, color: T.green }}>{fmt(r.payout)}</span>

@@ -550,6 +550,7 @@ function Leaderboard({ state }) {
   const board = useMemo(() => leaderboard(state), [state]);
   const race = useMemo(() => pointsRace(state), [state]);
   const milestones = useMemo(() => raceChartMilestones(state), [state]);
+  const elim = useMemo(() => eliminatedTeams(state), [state]);
   return /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-2" }, /* @__PURE__ */ React.createElement("div", { className: "flex gap-1", style: { background: T.soft, borderRadius: 10, padding: 3 } }, [["table", "Table"], ["race", "Race"]].map(([id, label]) => /* @__PURE__ */ React.createElement(
     "button",
     {
@@ -582,11 +583,12 @@ function Leaderboard({ state }) {
       i === 0 && p.total > 0 && /* @__PURE__ */ React.createElement(Trophy, { size: 16, color: T.gold }),
       /* @__PURE__ */ React.createElement("span", { style: { fontFamily: MONO, fontWeight: 700, fontSize: 17 } }, fmt(p.total)),
       isOpen ? /* @__PURE__ */ React.createElement(ChevronUp, { size: 16, color: T.sub }) : /* @__PURE__ */ React.createElement(ChevronDown, { size: 16, color: T.sub })
-    ), isOpen && /* @__PURE__ */ React.createElement("div", { style: { borderTop: `1px solid ${T.line}`, padding: "8px 12px 12px" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr auto auto auto", gap: "4px 12px", fontSize: 13 } }, /* @__PURE__ */ React.createElement("span", { style: { color: T.sub, fontSize: 11 } }, "TEAM"), /* @__PURE__ */ React.createElement("span", { style: { color: T.sub, fontSize: 11, fontFamily: MONO } }, "OWN"), /* @__PURE__ */ React.createElement("span", { style: { color: T.sub, fontSize: 11, fontFamily: MONO } }, "TEAM PTS"), /* @__PURE__ */ React.createElement("span", { style: { color: T.sub, fontSize: 11, fontFamily: MONO } }, "YOURS"), p.rows.map((r) => /* @__PURE__ */ React.createElement(FragmentRow, { key: r.code, r })))));
+    ), isOpen && /* @__PURE__ */ React.createElement("div", { style: { borderTop: `1px solid ${T.line}`, padding: "8px 12px 12px" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr auto auto auto", gap: "4px 12px", fontSize: 13 } }, /* @__PURE__ */ React.createElement("span", { style: { color: T.sub, fontSize: 11 } }, "TEAM"), /* @__PURE__ */ React.createElement("span", { style: { color: T.sub, fontSize: 11, fontFamily: MONO } }, "OWN"), /* @__PURE__ */ React.createElement("span", { style: { color: T.sub, fontSize: 11, fontFamily: MONO } }, "TEAM PTS"), /* @__PURE__ */ React.createElement("span", { style: { color: T.sub, fontSize: 11, fontFamily: MONO } }, "YOURS"), p.rows.map((r) => /* @__PURE__ */ React.createElement(FragmentRow, { key: r.code, r, elim })))));
   }));
 }
-function FragmentRow({ r }) {
-  return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("span", null, TEAM[r.code].name), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: MONO } }, r.shares, "/", r.pool), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: MONO } }, fmt(r.teamPts)), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: MONO, fontWeight: 700, color: T.green } }, fmt(r.payout)));
+function FragmentRow({ r, elim = /* @__PURE__ */ new Set() }) {
+  const isElim = elim.has(r.code);
+  return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("span", null, TEAM[r.code].name, isElim ? " \u274C" : ""), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: MONO } }, r.shares, "/", r.pool), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: MONO } }, fmt(r.teamPts)), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: MONO, fontWeight: 700, color: T.green } }, fmt(r.payout)));
 }
 function PlayerView({ state, setState }) {
   const board = useMemo(() => leaderboard(state), [state]);
