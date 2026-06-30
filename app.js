@@ -582,10 +582,47 @@ function PlayerView({ state, setState }) {
     ), isFixtureOpen && /* @__PURE__ */ React.createElement("div", { style: { padding: "0 12px 12px", borderTop: `1px solid ${T.soft}`, display: "flex", flexDirection: "column", gap: 14 } }, /* @__PURE__ */ React.createElement(TeamOwnershipPanel, { code: f.a, state, tp, tot }), /* @__PURE__ */ React.createElement(TeamOwnershipPanel, { code: f.b, state, tp, tot })));
   }))));
 }
+const ROUND_ORDER = { group: 0, r32: 1, r16: 2, qf: 3, sf: 4, third: 5, final: 6 };
+const ROUND_LABEL = { final: "Final", third: "Third Place", sf: "Semi-final", qf: "Quarter-final", r16: "Round of 16", r32: "Round of 32", group: "Group Stage" };
+function teamLastRound(state) {
+  const lr = Object.fromEntries(TEAMS.map((t) => [t.code, "group"]));
+  const bump = (code, stage) => {
+    const rank = ROUND_ORDER[stage] ?? -1;
+    if (rank > (ROUND_ORDER[lr[code]] ?? -1)) lr[code] = stage;
+  };
+  for (const m of state.matches) {
+    bump(m.a, m.stage);
+    bump(m.b, m.stage);
+  }
+  for (const f of state.knockoutFixtures || []) {
+    if (!TEAM[f.a] || !TEAM[f.b]) continue;
+    bump(f.a, f.stage);
+    bump(f.b, f.stage);
+  }
+  return lr;
+}
 function TeamsView({ state }) {
   const tp = useMemo(() => teamPoints(state), [state]);
   const tot = useMemo(() => totalShares(state), [state]);
-  return /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-4" }, GROUPS.map((g) => /* @__PURE__ */ React.createElement("div", { key: g }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, letterSpacing: 2, color: T.sub, fontWeight: 700, margin: "0 4px 6px" } }, "GROUP ", g), /* @__PURE__ */ React.createElement(Card, null, TEAMS.filter((t) => t.group === g).map((t, i) => /* @__PURE__ */ React.createElement("div", { key: t.code, style: { padding: "10px 12px", borderTop: i ? `1px solid ${T.line}` : "none" } }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2", style: { marginBottom: 6 } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: MONO, fontSize: 11, color: T.sub, width: 30 } }, t.code), /* @__PURE__ */ React.createElement("span", { style: { fontWeight: 600, flex: 1, fontSize: 14 } }, t.name), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: T.sub } }, "FIFA ", t.rank), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: MONO, fontSize: 13, fontWeight: 700, color: tp[t.code] ? T.green : T.sub, width: 44, textAlign: "right" } }, fmt(tp[t.code]))), /* @__PURE__ */ React.createElement(TeamOwnershipPanel, { code: t.code, state, tp, tot, showTitle: false })))))));
+  const lastRound = useMemo(() => teamLastRound(state), [state]);
+  const sections = useMemo(() => {
+    const byRound = {};
+    for (const t of TEAMS) {
+      const r = lastRound[t.code];
+      if (!byRound[r]) byRound[r] = [];
+      byRound[r].push(t);
+    }
+    for (const r of Object.keys(byRound)) byRound[r].sort((a, b) => a.group.localeCompare(b.group));
+    return Object.entries(byRound).sort(([a], [b]) => (ROUND_ORDER[b] ?? -1) - (ROUND_ORDER[a] ?? -1));
+  }, [lastRound]);
+  const teamRow = (t, i) => /* @__PURE__ */ React.createElement("div", { key: t.code, style: { padding: "10px 12px", borderTop: i ? `1px solid ${T.line}` : "none" } }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2", style: { marginBottom: 6 } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: MONO, fontSize: 11, color: T.sub, width: 30 } }, t.code), /* @__PURE__ */ React.createElement("span", { style: { fontWeight: 600, flex: 1, fontSize: 14 } }, t.name), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: T.sub } }, "FIFA ", t.rank), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: MONO, fontSize: 13, fontWeight: 700, color: tp[t.code] ? T.green : T.sub, width: 44, textAlign: "right" } }, fmt(tp[t.code]))), /* @__PURE__ */ React.createElement(TeamOwnershipPanel, { code: t.code, state, tp, tot, showTitle: false }));
+  return /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-4" }, sections.map(([round, teams]) => {
+    if (round === "group") {
+      const groupSet = [...new Set(teams.map((t) => t.group))];
+      return groupSet.map((g) => /* @__PURE__ */ React.createElement("div", { key: g }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, letterSpacing: 2, color: T.sub, fontWeight: 700, margin: "0 4px 6px" } }, "GROUP ", g), /* @__PURE__ */ React.createElement(Card, null, teams.filter((t) => t.group === g).map((t, i) => teamRow(t, i)))));
+    }
+    return /* @__PURE__ */ React.createElement("div", { key: round }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, letterSpacing: 2, color: T.sub, fontWeight: 700, margin: "0 4px 6px" } }, ROUND_LABEL[round] || round.toUpperCase()), /* @__PURE__ */ React.createElement(Card, null, teams.map((t, i) => teamRow(t, i))));
+  }));
 }
 const FEED_URL = "https://raw.githubusercontent.com/openfootball/worldcup.json/master/2026/worldcup.json";
 const NAME2CODE = {
