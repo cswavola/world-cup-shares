@@ -771,19 +771,6 @@ function PlayerView({ state, setState }) {
       <Card style={{ padding: "14px 0 10px" }}>
         <div style={{ fontWeight: 700, fontSize: 14, padding: "0 0 8px 14px" }}>Where the points come from</div>
         <DistBars rows={dist} elim={elim} />
-        <div style={{ borderTop: `1px solid ${T.line}`, margin: "10px 0 0", padding: "10px 4px 0" }}>
-          <TeamRaceChart data={raceData} />
-          {raceData && (
-            <div className="flex flex-wrap gap-x-3 gap-y-1" style={{ padding: "6px 12px 2px" }}>
-              {raceData.teamLines.map(({ code, color }) => (
-                <span key={code} style={{ fontSize: 11, color: T.sub, display: "inline-flex", alignItems: "center", gap: 4 }}>
-                  <span style={{ width: 8, height: 8, borderRadius: 4, background: color, flexShrink: 0 }} />
-                  {TEAM[code]?.name ?? code}
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
       </Card>
 
       <div>
@@ -835,6 +822,21 @@ function PlayerView({ state, setState }) {
           })}
         </Card>
       </div>
+
+      {raceData && (
+        <Card style={{ padding: "14px 4px 10px" }}>
+          <div style={{ fontWeight: 700, fontSize: 14, padding: "0 0 8px 10px" }}>Points over time</div>
+          <TeamRaceChart data={raceData} />
+          <div className="flex flex-wrap gap-x-3 gap-y-1" style={{ padding: "6px 12px 2px" }}>
+            {raceData.teamLines.map(({ code, color }) => (
+              <span key={code} style={{ fontSize: 11, color: T.sub, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                <span style={{ width: 8, height: 8, borderRadius: 4, background: color, flexShrink: 0 }} />
+                {TEAM[code]?.name ?? code}
+              </span>
+            ))}
+          </div>
+        </Card>
+      )}
     </div>
   );
 }
