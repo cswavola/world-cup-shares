@@ -743,33 +743,88 @@ function PlayerView({ state, setState }) {
   );
 }
 
+const ROUND_ORDER = { group: 0, r32: 1, r16: 2, qf: 3, sf: 4, third: 5, final: 6 };
+const ROUND_LABEL = { final: "Final", third: "Third Place", sf: "Semi-final", qf: "Quarter-final", r16: "Round of 16", r32: "Round of 32", group: "Group Stage" };
+
+function teamLastRound(state) {
+  const lr = Object.fromEntries(TEAMS.map((t) => [t.code, "group"]));
+  const bump = (code, stage) => {
+    const rank = ROUND_ORDER[stage] ?? -1;
+    if (rank > (ROUND_ORDER[lr[code]] ?? -1)) lr[code] = stage;
+  };
+  for (const m of state.matches) {
+    bump(m.a, m.stage);
+    bump(m.b, m.stage);
+  }
+  // Also include upcoming knockout fixtures so teams show their current round
+  // even before the match is played
+  for (const f of state.knockoutFixtures || []) {
+    if (!TEAM[f.a] || !TEAM[f.b]) continue;
+    bump(f.a, f.stage);
+    bump(f.b, f.stage);
+  }
+  return lr;
+}
+
 function TeamsView({ state }) {
   const tp = useMemo(() => teamPoints(state), [state]);
   const tot = useMemo(() => totalShares(state), [state]);
+  const lastRound = useMemo(() => teamLastRound(state), [state]);
+
+  // Build sections: group teams by last round (highest first), sorted by group within
+  const sections = useMemo(() => {
+    const byRound = {};
+    for (const t of TEAMS) {
+      const r = lastRound[t.code];
+      if (!byRound[r]) byRound[r] = [];
+      byRound[r].push(t);
+    }
+    for (const r of Object.keys(byRound)) byRound[r].sort((a, b) => a.group.localeCompare(b.group));
+    return Object.entries(byRound).sort(([a], [b]) => (ROUND_ORDER[b] ?? -1) - (ROUND_ORDER[a] ?? -1));
+  }, [lastRound]);
+
+  const teamRow = (t, i) => (
+    <div key={t.code} style={{ padding: "10px 12px", borderTop: i ? `1px solid ${T.line}` : "none" }}>
+      <div className="flex items-center gap-2" style={{ marginBottom: 6 }}>
+        <span style={{ fontFamily: MONO, fontSize: 11, color: T.sub, width: 30 }}>{t.code}</span>
+        <span style={{ fontWeight: 600, flex: 1, fontSize: 14 }}>{t.name}</span>
+        <span style={{ fontSize: 11, color: T.sub }}>FIFA {t.rank}</span>
+        <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 700, color: tp[t.code] ? T.green : T.sub, width: 44, textAlign: "right" }}>
+          {fmt(tp[t.code])}
+        </span>
+      </div>
+      <TeamOwnershipPanel code={t.code} state={state} tp={tp} tot={tot} showTitle={false} />
+    </div>
+  );
+
   return (
     <div className="flex flex-col gap-4">
-      {GROUPS.map((g) => (
-        <div key={g}>
-          <div style={{ fontSize: 11, letterSpacing: 2, color: T.sub, fontWeight: 700, margin: "0 4px 6px" }}>
-            GROUP {g}
-          </div>
-          <Card>
-            {TEAMS.filter((t) => t.group === g).map((t, i) => (
-              <div key={t.code} style={{ padding: "10px 12px", borderTop: i ? `1px solid ${T.line}` : "none" }}>
-                <div className="flex items-center gap-2" style={{ marginBottom: 6 }}>
-                  <span style={{ fontFamily: MONO, fontSize: 11, color: T.sub, width: 30 }}>{t.code}</span>
-                  <span style={{ fontWeight: 600, flex: 1, fontSize: 14 }}>{t.name}</span>
-                  <span style={{ fontSize: 11, color: T.sub }}>FIFA {t.rank}</span>
-                  <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 700, color: tp[t.code] ? T.green : T.sub, width: 44, textAlign: "right" }}>
-                    {fmt(tp[t.code])}
-                  </span>
-                </div>
-                <TeamOwnershipPanel code={t.code} state={state} tp={tp} tot={tot} showTitle={false} />
+      {sections.map(([round, teams]) => {
+        if (round === "group") {
+          // Keep group sub-sections for the group stage
+          const groupSet = [...new Set(teams.map((t) => t.group))];
+          return groupSet.map((g) => (
+            <div key={g}>
+              <div style={{ fontSize: 11, letterSpacing: 2, color: T.sub, fontWeight: 700, margin: "0 4px 6px" }}>
+                GROUP {g}
               </div>
-            ))}
-          </Card>
-        </div>
-      ))}
+              <Card>
+                {teams.filter((t) => t.group === g).map((t, i) => teamRow(t, i))}
+              </Card>
+            </div>
+          ));
+        }
+        return (
+          <div key={round}>
+            <div style={{ fontSize: 11, letterSpacing: 2, color: T.sub, fontWeight: 700, margin: "0 4px 6px" }}>
+              {ROUND_LABEL[round] || round.toUpperCase()}
+            </div>
+            <Card>
+              {teams.map((t, i) => teamRow(t, i))}
+            </Card>
+          </div>
+        );
+      })}
     </div>
   );
 }
