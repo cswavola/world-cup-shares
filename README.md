@@ -51,9 +51,20 @@ nothing to correct.
 
 ## Scoring rules
 
-Each player gets 10 shares, max 4 in one team. Team points: group win 1 /
-draw 0.5, reaching the knockouts 1, then 2 / 4 / 8 / 16 per knockout round won,
-third-place match 8, final 32. Your points from a team = team points × your
+Each player gets 10 shares, max 4 in one team. Team points: 
+Group stage:
+• Win: 1 pt
+• Draw: 0.5 pts
+• Reaching the knockouts: +1 pt
+
+Knockout rounds (points per win):
+• Round of 32: 2 pts
+• Round of 16: 4 pts
+• Quarter-final: 8 pts
+• Semi-final: 16 pts
+• Third-place match: 8 pts
+• Final: 32 pts
+Your points from a team = team points × your
 shares ÷ total shares held in that team across all players.
 
 ## Deploy (one time)

@@ -195,7 +195,7 @@ const FIXTURES = [
   ["2026-06-27", "17:00-4", "CRO", "GHA", "Philadelphia"]
 ].map(([date, time, a, b, city]) => ({ date, time, a, b, city }));
 function fixtureInstant(f) {
-  const m = /^(\d{1,2}):(\d{2})\s*([+-]\d{1,2})(?::?(\d{2}))?$/.exec((f.time || "").trim());
+  const m = /^(\d{1,2}):(\d{2})\s*(?:UTC\s*)?([+-]\d{1,2})(?::?(\d{2}))?$/.exec((f.time || "").trim());
   if (!m) return null;
   const [, hh, mm, offH, offM] = m;
   const sign = offH[0] === "-" ? "-" : "+";
@@ -334,11 +334,89 @@ function eliminatedTeams(state) {
   }
   return elim;
 }
+const GS_CLINCH = {
+  // Group A
+  MEX: { date: "2026-06-18", a: "MEX", b: "KOR" },
+  // 6 pts after MD2, H2H covers any tie
+  RSA: { date: "2026-06-24", a: "RSA", b: "KOR" },
+  // won MD3 to finish 2nd
+  // Group B
+  SUI: { date: "2026-06-18", a: "SUI", b: "BIH" },
+  // 4 pts, H2H over BIH covers worst case
+  CAN: { date: "2026-06-18", a: "CAN", b: "QAT" },
+  // 4 pts, GD over BIH covers worst case
+  BIH: null,
+  // Group C
+  BRA: { date: "2026-06-24", a: "SCO", b: "BRA" },
+  // won MD3
+  MAR: { date: "2026-06-24", a: "MAR", b: "HAI" },
+  // won MD3
+  // Group D
+  USA: { date: "2026-06-19", a: "USA", b: "AUS" },
+  // 6 pts after MD2
+  AUS: { date: "2026-06-25", a: "PAR", b: "AUS" },
+  // drew MD3 to finish 2nd
+  PAR: null,
+  // Group E
+  GER: { date: "2026-06-20", a: "GER", b: "CIV" },
+  // 6 pts, H2H over CIV covers tie
+  CIV: { date: "2026-06-25", a: "CUW", b: "CIV" },
+  // won MD3
+  ECU: null,
+  // Group F — NED not safe after MD2 (GD/goals-scored tie-break could go wrong)
+  NED: { date: "2026-06-25", a: "TUN", b: "NED" },
+  // won MD3
+  JPN: { date: "2026-06-25", a: "JPN", b: "SWE" },
+  // drew MD3 → 5 pts
+  SWE: null,
+  // Group G
+  BEL: { date: "2026-06-26", a: "NZL", b: "BEL" },
+  // won MD3
+  EGY: { date: "2026-06-26", a: "EGY", b: "IRN" },
+  // drew MD3 → 5 pts
+  // Group H
+  ESP: { date: "2026-06-26", a: "URU", b: "ESP" },
+  // won MD3
+  CPV: { date: "2026-06-26", a: "CPV", b: "KSA" },
+  // drew MD3 → 3 pts, URU also drew/lost
+  // Group I
+  FRA: { date: "2026-06-22", a: "FRA", b: "IRQ" },
+  // 6 pts after MD2, unreachable
+  NOR: { date: "2026-06-22", a: "NOR", b: "SEN" },
+  // 6 pts after MD2, unreachable
+  SEN: null,
+  // Group J
+  ARG: { date: "2026-06-22", a: "ARG", b: "AUT" },
+  // 6 pts after MD2
+  AUT: { date: "2026-06-27", a: "ALG", b: "AUT" },
+  // drew MD3 → 4 pts, runner-up on GD
+  ALG: null,
+  // Group K
+  COL: { date: "2026-06-23", a: "COL", b: "COD" },
+  // 6 pts after MD2
+  POR: { date: "2026-06-23", a: "POR", b: "UZB" },
+  // 4 pts, GD over COD covers worst case
+  COD: null,
+  // Group L
+  ENG: { date: "2026-06-27", a: "PAN", b: "ENG" },
+  // won MD3
+  CRO: { date: "2026-06-27", a: "CRO", b: "GHA" },
+  // won MD3 → 6 pts
+  GHA: null
+};
 function pointsRace(state) {
   const chron = [...state.matches].sort((x, y) => (x.date || "") < (y.date || "") ? -1 : 1);
   const tot = totalShares(state);
   const tp = Object.fromEntries(TEAMS.map((t) => [t.code, 0]));
-  for (const code of state.advanced) tp[code] += 1;
+  const advancedSet = new Set(state.advanced);
+  const matchClinch = {};
+  for (const [code, clinch] of Object.entries(GS_CLINCH)) {
+    if (!advancedSet.has(code) || !clinch) continue;
+    const key = `${clinch.date}${clinch.a}${clinch.b}`;
+    (matchClinch[key] ||= []).push(code);
+  }
+  const bestThird = state.advanced.filter((code) => !GS_CLINCH[code]);
+  const lastGroupIdx = chron.reduce((last, m, i) => m.stage === "group" ? i : last, -1);
   const snap = (label) => {
     const row = { label };
     for (const p of state.players) {
@@ -358,6 +436,10 @@ function pointsRace(state) {
         tp[m.b] += s.draw;
       } else if (m.outcome === "a") tp[m.a] += s.win;
       else if (m.outcome === "b") tp[m.b] += s.win;
+    }
+    for (const code of matchClinch[`${m.date}${m.a}${m.b}`] || []) tp[code] += 1;
+    if (i === lastGroupIdx) {
+      for (const code of bestThird) tp[code] += 1;
     }
     data.push(snap(String(i + 1)));
   });
@@ -1081,9 +1163,12 @@ function App() {
   const distributed = Object.values(teamPoints(eff)).reduce((a, b) => a + b, 0);
   const lastResult = merged.matches.length > 0 ? merged.matches.reduce((best, m) => m.date + (m.time || "") > best.date + (best.time || "") ? m : best) : null;
   const fmtResultDate = ({ date, time }) => {
+    const instant = time ? fixtureInstant({ date, time }) : null;
+    if (instant) {
+      return instant.toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false });
+    }
     const [, mo, dy] = date.split("-");
-    const d = `${["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][+mo - 1]} ${+dy}`;
-    return time ? `${d} ${time}` : d;
+    return `${["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][+mo - 1]} ${+dy}`;
   };
   const tabs = [
     ["board", "Standings", Trophy],
@@ -1093,7 +1178,7 @@ function App() {
     ["bingo", "Bingo", Grid],
     ["news", "News", Rss]
   ];
-  return /* @__PURE__ */ React.createElement("div", { style: { minHeight: "100vh", background: T.bg, color: T.ink, fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" } }, /* @__PURE__ */ React.createElement("header", { style: { background: T.greenDark, color: "#fff", padding: "18px 16px 14px", paddingTop: "calc(18px + env(safe-area-inset-top))" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 24, fontWeight: 900, letterSpacing: -0.5 } }, "WC26 ", /* @__PURE__ */ React.createElement("span", { style: { color: T.gold } }, "SHARES")), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, opacity: 0.85, fontFamily: MONO, marginTop: 2 } }, state.players.length, " players \xB7 max 4 shares per team \xB7 ", fmt(distributed), " pts distributed", /* @__PURE__ */ React.createElement("span", { style: { marginLeft: 8, opacity: 0.7 } }, feed === "loading" ? "\xB7 syncing\u2026" : feed === "fallback" ? "\xB7 offline (schedule only)" : lastResult ? `\xB7 updated ${fmtResultDate(lastResult)} \u2713` : "\xB7 live \u2713"))), /* @__PURE__ */ React.createElement("main", { style: { padding: 12, paddingBottom: 84, maxWidth: 560, margin: "0 auto" } }, tab === "board" && /* @__PURE__ */ React.createElement(Leaderboard, { state: eff }), tab === "me" && /* @__PURE__ */ React.createElement(PlayerView, { state: eff, setState }), tab === "teams" && /* @__PURE__ */ React.createElement(TeamsView, { state: eff }), tab === "fixtures" && /* @__PURE__ */ React.createElement(FixturesView, { state: eff }), tab === "bingo" && /* @__PURE__ */ React.createElement(BingoView, null), tab === "news" && /* @__PURE__ */ React.createElement(NewsfeedView, null)), /* @__PURE__ */ React.createElement("nav", { style: { position: "fixed", bottom: 0, left: 0, right: 0, background: T.card, borderTop: `1px solid ${T.line}`, display: "flex", paddingBottom: "env(safe-area-inset-bottom)" } }, tabs.map(([id, label, Icon]) => /* @__PURE__ */ React.createElement(
+  return /* @__PURE__ */ React.createElement("div", { style: { minHeight: "100vh", background: T.bg, color: T.ink, fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" } }, /* @__PURE__ */ React.createElement("header", { style: { background: T.greenDark, color: "#fff", padding: "18px 16px 14px", paddingTop: "calc(18px + env(safe-area-inset-top))" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 24, fontWeight: 900, letterSpacing: -0.5 } }, "WC26 ", /* @__PURE__ */ React.createElement("span", { style: { color: T.gold } }, "SHARES")), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, opacity: 0.85, fontFamily: MONO, marginTop: 2 } }, fmt(distributed), " pts distributed", /* @__PURE__ */ React.createElement("span", { style: { marginLeft: 8, opacity: 0.7 } }, feed === "loading" ? "\xB7 syncing\u2026" : feed === "fallback" ? "\xB7 offline (schedule only)" : lastResult ? `\xB7 updated ${fmtResultDate(lastResult)} \u2713` : "\xB7 live \u2713"))), /* @__PURE__ */ React.createElement("main", { style: { padding: 12, paddingBottom: 84, maxWidth: 560, margin: "0 auto" } }, tab === "board" && /* @__PURE__ */ React.createElement(Leaderboard, { state: eff }), tab === "me" && /* @__PURE__ */ React.createElement(PlayerView, { state: eff, setState }), tab === "teams" && /* @__PURE__ */ React.createElement(TeamsView, { state: eff }), tab === "fixtures" && /* @__PURE__ */ React.createElement(FixturesView, { state: eff }), tab === "bingo" && /* @__PURE__ */ React.createElement(BingoView, null), tab === "news" && /* @__PURE__ */ React.createElement(NewsfeedView, null)), /* @__PURE__ */ React.createElement("nav", { style: { position: "fixed", bottom: 0, left: 0, right: 0, background: T.card, borderTop: `1px solid ${T.line}`, display: "flex", paddingBottom: "env(safe-area-inset-bottom)" } }, tabs.map(([id, label, Icon]) => /* @__PURE__ */ React.createElement(
     "button",
     {
       key: id,
