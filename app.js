@@ -299,42 +299,38 @@ function leaderboard(state) {
 }
 const fmt = (x) => (Math.round(x * 100) / 100).toFixed(2);
 function eliminatedTeams(state) {
-  const elim = /* @__PURE__ */ new Set();
-  const stageTeams = { r32: /* @__PURE__ */ new Set(), r16: /* @__PURE__ */ new Set(), qf: /* @__PURE__ */ new Set(), sf: /* @__PURE__ */ new Set(), third: /* @__PURE__ */ new Set(), final: /* @__PURE__ */ new Set() };
+  const playedKeys = new Set(state.matches.map((m) => [m.a, m.b].sort().join("-")));
+  const hasUpcoming = /* @__PURE__ */ new Set();
+  for (const f of FIXTURES) {
+    const key = [f.a, f.b].sort().join("-");
+    if (!playedKeys.has(key)) {
+      hasUpcoming.add(f.a);
+      hasUpcoming.add(f.b);
+    }
+  }
   for (const f of state.knockoutFixtures || []) {
-    if (stageTeams[f.stage]) {
-      if (TEAM[f.a]) stageTeams[f.stage].add(f.a);
-      if (TEAM[f.b]) stageTeams[f.stage].add(f.b);
+    if (!TEAM[f.a] || !TEAM[f.b]) continue;
+    const key = [f.a, f.b].sort().join("-");
+    if (!playedKeys.has(key)) {
+      hasUpcoming.add(f.a);
+      hasUpcoming.add(f.b);
     }
   }
   for (const m of state.matches) {
-    if (stageTeams[m.stage]) {
-      if (TEAM[m.a]) stageTeams[m.stage].add(m.a);
-      if (TEAM[m.b]) stageTeams[m.stage].add(m.b);
+    if (m.stage === "group") continue;
+    if (m.outcome === "a") hasUpcoming.add(m.a);
+    else if (m.outcome === "b") hasUpcoming.add(m.b);
+    if (m.stage === "sf") {
+      if (m.outcome === "a") hasUpcoming.add(m.b);
+      else if (m.outcome === "b") hasUpcoming.add(m.a);
     }
   }
-  const r32Known = /* @__PURE__ */ new Set([...state.advanced, ...stageTeams.r32]);
-  if (r32Known.size > 0) {
-    for (const t of TEAMS) {
-      if (!r32Known.has(t.code)) elim.add(t.code);
-    }
-  }
-  for (const [curr, next] of [["r32", "r16"], ["r16", "qf"], ["qf", "sf"]]) {
-    if (stageTeams[curr].size === 0 || stageTeams[next].size === 0) continue;
-    for (const code of stageTeams[curr]) {
-      if (!stageTeams[next].has(code)) elim.add(code);
-    }
-  }
-  for (const m of state.matches) {
-    if (m.stage === "group" || m.stage === "sf") continue;
-    if (m.outcome === "a") elim.add(m.b);
-    else if (m.outcome === "b") elim.add(m.a);
-  }
-  const afterSF = /* @__PURE__ */ new Set([...stageTeams.final, ...stageTeams.third]);
-  if (stageTeams.sf.size > 0 && afterSF.size > 0) {
-    for (const code of stageTeams.sf) {
-      if (!afterSF.has(code)) elim.add(code);
-    }
+  const playedTeams = new Set(
+    state.matches.flatMap((m) => [m.a, m.b]).filter((code) => TEAM[code])
+  );
+  const elim = /* @__PURE__ */ new Set();
+  for (const t of TEAMS) {
+    if (playedTeams.has(t.code) && !hasUpcoming.has(t.code)) elim.add(t.code);
   }
   return elim;
 }

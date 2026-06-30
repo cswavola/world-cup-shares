@@ -319,64 +319,47 @@ function leaderboard(state) {
 
 const fmt = (x) => (Math.round(x * 100) / 100).toFixed(2);
 
-// Derives eliminated teams from the live fixture schedule:
-// once a round's bracket is set, any team absent from that round (but present in the prior one)
-// is out. Chains r32→r16→qf→sf, then sf→(final+third), then final/third match losers.
+// A team is eliminated once they've played at least one game and have no upcoming fixtures.
+// "Upcoming" = unplayed group game OR unplayed knockout fixture (from the live bracket).
+// Knockout winners are kept active even before the next bracket is published.
+// SF losers are kept active until the third-place match is played.
 function eliminatedTeams(state) {
-  const elim = new Set();
+  const playedKeys = new Set(state.matches.map(m => [m.a, m.b].sort().join("-")));
+  const hasUpcoming = new Set();
 
-  // Collect known teams per knockout stage from fixtures and played matches.
-  // knockoutFixtures has unresolved placeholders ("Winner Group A") that won't map
-  // through TEAM[code], so we filter to known codes only.
-  const stageTeams = { r32: new Set(), r16: new Set(), qf: new Set(), sf: new Set(), third: new Set(), final: new Set() };
+  // Unplayed group-stage fixtures (hardcoded schedule)
+  for (const f of FIXTURES) {
+    const key = [f.a, f.b].sort().join("-");
+    if (!playedKeys.has(key)) { hasUpcoming.add(f.a); hasUpcoming.add(f.b); }
+  }
+
+  // Unplayed knockout fixtures (live-feed bracket; skip unresolved placeholders)
   for (const f of state.knockoutFixtures || []) {
-    if (stageTeams[f.stage]) {
-      if (TEAM[f.a]) stageTeams[f.stage].add(f.a);
-      if (TEAM[f.b]) stageTeams[f.stage].add(f.b);
-    }
+    if (!TEAM[f.a] || !TEAM[f.b]) continue;
+    const key = [f.a, f.b].sort().join("-");
+    if (!playedKeys.has(key)) { hasUpcoming.add(f.a); hasUpcoming.add(f.b); }
   }
+
+  // Knockout winners stay active even before the next round's bracket is published.
+  // SF losers also stay active — they still have the third-place match.
   for (const m of state.matches) {
-    if (stageTeams[m.stage]) {
-      if (TEAM[m.a]) stageTeams[m.stage].add(m.a);
-      if (TEAM[m.b]) stageTeams[m.stage].add(m.b);
+    if (m.stage === "group") continue;
+    if (m.outcome === "a") hasUpcoming.add(m.a);
+    else if (m.outcome === "b") hasUpcoming.add(m.b);
+    if (m.stage === "sf") {
+      if (m.outcome === "a") hasUpcoming.add(m.b);
+      else if (m.outcome === "b") hasUpcoming.add(m.a);
     }
   }
 
-  // Group-stage elimination: teams not in R32 once that bracket is known.
-  // state.advanced (teams that appear in resolved R32 matches) supplements fixtures.
-  const r32Known = new Set([...state.advanced, ...stageTeams.r32]);
-  if (r32Known.size > 0) {
-    for (const t of TEAMS) {
-      if (!r32Known.has(t.code)) elim.add(t.code);
-    }
-  }
+  const playedTeams = new Set(
+    state.matches.flatMap(m => [m.a, m.b]).filter(code => TEAM[code])
+  );
 
-  // r32→r16→qf→sf: if the next round has any known teams, absent teams from this round are out.
-  for (const [curr, next] of [["r32","r16"], ["r16","qf"], ["qf","sf"]]) {
-    if (stageTeams[curr].size === 0 || stageTeams[next].size === 0) continue;
-    for (const code of stageTeams[curr]) {
-      if (!stageTeams[next].has(code)) elim.add(code);
-    }
+  const elim = new Set();
+  for (const t of TEAMS) {
+    if (playedTeams.has(t.code) && !hasUpcoming.has(t.code)) elim.add(t.code);
   }
-
-  // Also mark losers directly from match results — handles the window where a result
-  // is recorded but the next round's bracket isn't published yet.
-  // Exclude SF: those losers still play the third-place match.
-  for (const m of state.matches) {
-    if (m.stage === "group" || m.stage === "sf") continue;
-    if (m.outcome === "a") elim.add(m.b);
-    else if (m.outcome === "b") elim.add(m.a);
-  }
-
-  // SF losers go to third-place, not eliminated yet.
-  // A team is eliminated if it's in SF but missing from both final and third.
-  const afterSF = new Set([...stageTeams.final, ...stageTeams.third]);
-  if (stageTeams.sf.size > 0 && afterSF.size > 0) {
-    for (const code of stageTeams.sf) {
-      if (!afterSF.has(code)) elim.add(code);
-    }
-  }
-
   return elim;
 }
 
