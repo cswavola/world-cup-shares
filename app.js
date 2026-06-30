@@ -291,7 +291,7 @@ const FIXTURES = [
   ["2026-06-27", "17:00-4", "CRO", "GHA", "Philadelphia"]
 ].map(([date, time, a, b, city]) => ({ date, time, a, b, city }));
 function fixtureInstant(f) {
-  const m = /^(\d{1,2}):(\d{2})\s*([+-]\d{1,2})(?::?(\d{2}))?$/.exec((f.time || "").trim());
+  const m = /^(\d{1,2}):(\d{2})(?:\s+UTC)?\s*([+-]\d{1,2})(?::?(\d{2}))?$/.exec((f.time || "").trim());
   if (!m) return null;
   const [, hh, mm, offH, offM] = m;
   const sign = offH[0] === "-" ? "-" : "+";
@@ -654,13 +654,13 @@ function PlayerView({ state, setState }) {
           onClick: () => setOpenFixture(isFixtureOpen ? null : fixtureKey),
           style: { padding: "10px 12px", display: "block", width: "100%", background: "none", textAlign: "left" }
         },
-        /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2" }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, flex: 1 } }, /* @__PURE__ */ React.createElement("span", { style: { display: "inline-block", width: 16 } }, winnerCode === f.a ? "\u26BD" : ""), /* @__PURE__ */ React.createElement("b", { style: { color: sel.shares[f.a] ? T.green : T.ink } }, nameA), /* @__PURE__ */ React.createElement("span", { style: { color: T.sub } }, " v "), /* @__PURE__ */ React.createElement("b", { style: { color: sel.shares[f.b] ? T.green : T.ink } }, nameB), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-block", width: 16, marginLeft: 2 } }, winnerCode === f.b ? "\u26BD" : "")), /* @__PURE__ */ React.createElement("span", { style: {
+        /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2" }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, flex: 1 } }, /* @__PURE__ */ React.createElement("span", { style: { display: "inline-block", width: 20 } }, winnerCode === f.a ? "\u26BD" : ""), /* @__PURE__ */ React.createElement("b", { style: { color: sel.shares[f.a] ? T.green : T.ink } }, nameA), /* @__PURE__ */ React.createElement("span", { style: { color: T.sub } }, " v "), /* @__PURE__ */ React.createElement("b", { style: { color: sel.shares[f.b] ? T.green : T.ink } }, nameB), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-block", width: 20, marginLeft: 2 } }, winnerCode === f.b ? "\u26BD" : "")), /* @__PURE__ */ React.createElement("span", { style: {
           fontFamily: MONO,
           fontSize: 12,
           color: match ? match.outcome === "draw" ? T.sub : T.green : T.sub,
           fontWeight: match ? 700 : 400
         } }, scoreStr || (match ? "Draw" : fmtDate(localDateKey(f)))), isFixtureOpen ? /* @__PURE__ */ React.createElement(ChevronUp, { size: 14, color: T.sub }) : /* @__PURE__ */ React.createElement(ChevronDown, { size: 14, color: T.sub })),
-        /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: T.sub, marginTop: 2 } }, match ? [winnerCode ? `${TEAM[winnerCode]?.name ?? winnerCode} won` : "Draw", f.city, stageLabel].filter(Boolean).join(" \xB7 ") : [f.city, stageLabel, `kickoff ${localKickoff(f)}`].filter(Boolean).join(" \xB7 "))
+        /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: T.sub, marginTop: 2, paddingLeft: 20 } }, match ? [winnerCode ? `${TEAM[winnerCode]?.name ?? winnerCode} won` : "Draw", f.city, stageLabel].filter(Boolean).join(" \xB7 ") : [f.city, stageLabel, `kickoff ${localKickoff(f)}`].filter(Boolean).join(" \xB7 "))
       ), isFixtureOpen && /* @__PURE__ */ React.createElement("div", { style: { padding: "0 12px 12px", borderTop: `1px solid ${T.soft}`, display: "flex", flexDirection: "column", gap: 14 } }, teamA ? /* @__PURE__ */ React.createElement(TeamOwnershipPanel, { code: f.a, state, tp, tot }) : /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: T.sub, fontStyle: "italic" } }, nameA, " \u2014 TBD"), teamB ? /* @__PURE__ */ React.createElement(TeamOwnershipPanel, { code: f.b, state, tp, tot }) : /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: T.sub, fontStyle: "italic" } }, nameB, " \u2014 TBD")));
     });
   })())), raceData && /* @__PURE__ */ React.createElement(Card, { style: { padding: "14px 4px 10px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 700, fontSize: 14, padding: "0 0 8px 10px" } }, "Points over time"), /* @__PURE__ */ React.createElement(TeamRaceChart, { data: raceData }), /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap gap-x-3 gap-y-1", style: { padding: "6px 12px 2px" } }, raceData.teamLines.map(({ code, color }) => /* @__PURE__ */ React.createElement("span", { key: code, style: { fontSize: 11, color: T.sub, display: "inline-flex", alignItems: "center", gap: 4 } }, /* @__PURE__ */ React.createElement("span", { style: { width: 8, height: 8, borderRadius: 4, background: color, flexShrink: 0 } }), TEAM[code]?.name ?? code)))));
