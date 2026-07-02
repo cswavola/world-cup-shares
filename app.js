@@ -667,6 +667,7 @@ function PlayerView({ state, setState }) {
 }
 const ROUND_ORDER = { group: 0, r32: 1, r16: 2, qf: 3, sf: 4, third: 5, final: 6 };
 const ROUND_LABEL = { final: "Final", third: "Third Place", sf: "Semi-final", qf: "Quarter-final", r16: "Round of 16", r32: "Round of 32", group: "Group Stage" };
+const NEXT_KNOCKOUT_STAGE = { r32: "r16", r16: "qf", qf: "sf" };
 function teamLastRound(state) {
   const lr = Object.fromEntries(TEAMS.map((t) => [t.code, "group"]));
   const bump = (code, stage) => {
@@ -676,6 +677,18 @@ function teamLastRound(state) {
   for (const m of state.matches) {
     bump(m.a, m.stage);
     bump(m.b, m.stage);
+    if (m.stage === "sf") {
+      if (m.outcome === "a") {
+        bump(m.a, "final");
+        bump(m.b, "third");
+      } else if (m.outcome === "b") {
+        bump(m.b, "final");
+        bump(m.a, "third");
+      }
+    } else if (NEXT_KNOCKOUT_STAGE[m.stage]) {
+      const winner = m.outcome === "a" ? m.a : m.outcome === "b" ? m.b : null;
+      if (winner) bump(winner, NEXT_KNOCKOUT_STAGE[m.stage]);
+    }
   }
   for (const f of state.knockoutFixtures || []) {
     if (!TEAM[f.a] || !TEAM[f.b]) continue;
