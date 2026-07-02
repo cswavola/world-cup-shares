@@ -1627,6 +1627,7 @@ function App() {
   const [live, setLive] = useState({ matches: [], advanced: [], knockoutFixtures: [] });
   const [override, setOverride] = useState({ matches: [], advanced: [] });
   const [feed, setFeed] = useState("loading");    // loading | live | fallback
+  const [lastFetched, setLastFetched] = useState(null);
   const [tab, setTab] = useState("board");
   const [latestPostDate, setLatestPostDate] = useState(null);
   const [newsSeenDate, setNewsSeenDate] = useState(
@@ -1652,7 +1653,7 @@ function App() {
 
     fetch(FEED_URL, { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : Promise.reject()))
-      .then((data) => { setLive(parseFeed(data)); setFeed("live"); })
+      .then((data) => { setLive(parseFeed(data)); setFeed("live"); setLastFetched(new Date()); })
       .catch(() => { setFeed("fallback"); });
 
     // optional admin override, committed from a PC; absent by default
@@ -1688,17 +1689,9 @@ function App() {
 
   const distributed = Object.values(teamPoints(eff)).reduce((a, b) => a + b, 0);
 
-  const lastResult = merged.matches.length > 0
-    ? merged.matches.reduce((best, m) => (m.date + (m.time || "") > best.date + (best.time || "") ? m : best))
+  const fmtFetched = lastFetched
+    ? lastFetched.toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false })
     : null;
-  const fmtResultDate = ({ date, time }) => {
-    const instant = time ? fixtureInstant({ date, time }) : null;
-    if (instant) {
-      return instant.toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false });
-    }
-    const [, mo, dy] = date.split("-");
-    return `${["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][+mo-1]} ${+dy}`;
-  };
   const tabs = [
     ["board", "Standings", Trophy],
     ["me", "Players", User],
@@ -1717,7 +1710,7 @@ function App() {
         <div style={{ fontSize: 12, opacity: 0.85, fontFamily: MONO, marginTop: 2 }}>
           {fmt(distributed)} pts distributed
           <span style={{ marginLeft: 8, opacity: 0.7 }}>
-            {feed === "loading" ? "· syncing…" : feed === "fallback" ? "· offline (schedule only)" : lastResult ? `· updated ${fmtResultDate(lastResult)} ✓` : "· live ✓"}
+            {feed === "loading" ? "· syncing…" : feed === "fallback" ? "· offline (schedule only)" : fmtFetched ? `· updated ${fmtFetched} ✓` : "· live ✓"}
           </span>
         </div>
       </header>
