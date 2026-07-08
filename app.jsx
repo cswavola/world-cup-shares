@@ -489,14 +489,20 @@ function eliminatedTeams(state) {
     const key = [f.a, f.b].sort().join("-");
     if (!playedKeys.has(key)) { hasUpcoming.add(f.a); hasUpcoming.add(f.b); }
   }
+  // Only each team's most advanced knockout match matters here — an earlier
+  // round win shouldn't keep a team "active" after they've since lost a later one.
+  const latestKO = {};
   for (const m of state.matches) {
     if (m.stage === "group") continue;
-    if (m.outcome === "a") hasUpcoming.add(m.a);
-    else if (m.outcome === "b") hasUpcoming.add(m.b);
-    if (m.stage === "sf") {
-      if (m.outcome === "a") hasUpcoming.add(m.b);
-      else if (m.outcome === "b") hasUpcoming.add(m.a);
+    for (const code of [m.a, m.b]) {
+      if (!latestKO[code] || ROUND_ORDER[m.stage] > ROUND_ORDER[latestKO[code].stage]) latestKO[code] = m;
     }
+  }
+  for (const code in latestKO) {
+    const m = latestKO[code];
+    const won = (m.outcome === "a" && m.a === code) || (m.outcome === "b" && m.b === code);
+    if (won) hasUpcoming.add(code);
+    else if (m.stage === "sf") hasUpcoming.add(code); // sf loser stays active for the third-place match
   }
   const playedTeams = new Set(state.matches.flatMap(m => [m.a, m.b]).filter(code => TEAM[code]));
   const elim = new Set();
