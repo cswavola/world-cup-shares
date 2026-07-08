@@ -9,6 +9,12 @@
 // const { useState, useEffect, useMemo } = React;
 const { useState, useEffect, useMemo, useRef } = React;
 
+// d3-shape's line generator + Catmull-Rom curve draw a smooth path through
+// a dense set of points — used below to trace the bracket's ownership
+// ribbons tightly along the actual ring/angle structure, rather than a
+// generic two-point bezier that cuts a straight-ish diagonal between them.
+import { line as d3Line, curveCatmullRom } from "d3-shape";
+
 
 /* ---- per-team staged points race, used in PlayerView ---- */
 // Returns checkpoint labels and one line per team (payout, not raw pts).
@@ -404,6 +410,72 @@ const TEAM_FLAG_COLOR = {
   TUR:"#E30A17", URU:"#0038A8", USA:"#002868", UZB:"#1EB53A",
 };
 
+// FIFA code -> ISO 3166-1 alpha-2, for building flag emoji from regional-indicator
+// codepoints. England & Scotland have no ISO country code, so they use the
+// Unicode "tag sequence" flags instead (handled as literal emoji below).
+const TEAM_ISO2 = {
+  ALG:"DZ", ARG:"AR", AUS:"AU", AUT:"AT", BEL:"BE", BIH:"BA", BRA:"BR", CAN:"CA",
+  CIV:"CI", COD:"CD", COL:"CO", CPV:"CV", CRO:"HR", CUW:"CW", CZE:"CZ", ECU:"EC",
+  EGY:"EG", ESP:"ES", FRA:"FR", GER:"DE", GHA:"GH", HAI:"HT", IRN:"IR", IRQ:"IQ",
+  JOR:"JO", JPN:"JP", KOR:"KR", KSA:"SA", MAR:"MA", MEX:"MX", NED:"NL", NOR:"NO",
+  NZL:"NZ", PAN:"PA", PAR:"PY", POR:"PT", QAT:"QA", RSA:"ZA", SEN:"SN", SUI:"CH",
+  SWE:"SE", TUN:"TN", TUR:"TR", URU:"UY", USA:"US", UZB:"UZ",
+};
+
+function flagEmoji(code) {
+  const iso = TEAM_ISO2[code];
+  if (!iso) return "🏳️";
+  return [...iso].map((c) => String.fromCodePoint(0x1f1e6 + c.charCodeAt(0) - 65)).join("");
+}
+
+// England & Scotland have no ISO country code, so there's no regional-indicator
+// emoji for them — only a Unicode "tag sequence" (🏴󠁧󠁢󠁥󠁮󠁧󠁿 / 🏴󠁧󠁢󠁳󠁣󠁴󠁿), which several
+// platforms/fonts fail to render (falls back to a blank black flag). Draw
+// these two by hand instead so they show up everywhere.
+function flagSpecialShape(code) {
+  if (code === "ENG") return (
+    <>
+      <rect width="20" height="20" fill="#fff" />
+      <rect x="0" y="8" width="20" height="4" fill="#CE1124" />
+      <rect x="8" y="0" width="4" height="20" fill="#CE1124" />
+    </>
+  );
+  if (code === "SCO") return (
+    <>
+      <rect width="20" height="20" fill="#0065BD" />
+      <line x1="0" y1="0" x2="20" y2="20" stroke="#fff" strokeWidth="4" />
+      <line x1="20" y1="0" x2="0" y2="20" stroke="#fff" strokeWidth="4" />
+    </>
+  );
+  return null;
+}
+
+// SVG-context flag glyph (inside another <svg>): a nested <svg> for ENG/SCO,
+// else the flag emoji as text.
+function FlagGlyphSvg({ code, x, y, size }) {
+  const shape = flagSpecialShape(code);
+  const r = size * 0.62;
+  if (shape) return (
+    <g>
+      <svg x={x - size / 2} y={y - size / 2} width={size} height={size} viewBox="0 0 20 20">{shape}</svg>
+      <rect x={x - size / 2} y={y - size / 2} width={size} height={size} rx={size * 0.12} fill="none" stroke={T.line} strokeWidth="1" />
+    </g>
+  );
+  return (
+    <g>
+      <text x={x} y={y} fontSize={size} textAnchor="middle" dominantBaseline="central">{flagEmoji(code)}</text>
+      <circle cx={x} cy={y} r={r} fill="none" stroke={T.line} strokeWidth="1" />
+    </g>
+  );
+}
+
+// HTML-context flag glyph (inside ordinary markup): same special-cases.
+function FlagGlyphHtml({ code, size = 16 }) {
+  const shape = flagSpecialShape(code);
+  if (shape) return <svg width={size} height={size} viewBox="0 0 20 20" style={{ display: "inline-block", verticalAlign: "middle" }}>{shape}</svg>;
+  return <span style={{ fontSize: size, lineHeight: 1 }}>{flagEmoji(code)}</span>;
+}
+
 const DEMO = {
   demo: true,
   me: null,
@@ -636,6 +708,261 @@ function TeamOwnershipPanel({ code, state, tp, tot, showTitle = true }) {
   );
 }
 
+/* ---------- circular knockout bracket ---------- */
+// Concentric rings, Round of 32 outermost working in to the Final at the
+// centre. Each ring's flags grow with it — more room per team as the field
+// narrows — and everything is driven live off state.knockoutFixtures.
+
+const BRACKET_SIZE = 380;
+const BRACKET_CENTER = BRACKET_SIZE / 2;
+const BRACKET_RINGS = {
+  r32:   { rOuter: 178, rInner: 152, flagSize: 12 },
+  r16:   { rOuter: 152, rInner: 122, flagSize: 16 },
+  qf:    { rOuter: 122, rInner: 90,  flagSize: 20 },
+  sf:    { rOuter: 90,  rInner: 56,  flagSize: 25 },
+  final: { rOuter: 56,  rInner: 26,  flagSize: 30 },
+};
+const BRACKET_CHAMPION_SIZE = 36;
+
+function bracketPt(angleDeg, radius) {
+  const rad = ((angleDeg - 90) * Math.PI) / 180;
+  return { x: BRACKET_CENTER + radius * Math.cos(rad), y: BRACKET_CENTER + radius * Math.sin(rad) };
+}
+const bracketMidAngle = (node, total) => ((node.start + node.end) / 2 / total) * 360;
+const bracketSlotAngle = (slot, total) => ((slot + 0.5) / total) * 360;
+
+// Walk the tree once, producing a flat list of render-ready nodes: each
+// carries its own ring, the two team slots (code + angle + decided/eliminated),
+// and the angle used to draw it one ring further out (for the connector line).
+// Per-team share ownership, keyed by code — the same breakdown ShareBar
+// draws elsewhere, reused here to paint each team's bracket line as a
+// proportional ribbon of its owners' colors. Teams nobody holds shares in
+// are absent, so their lines fall back to the plain structural line.
+function teamOwnersMap(state) {
+  const tot = totalShares(state);
+  const map = {};
+  for (const t of TEAMS) {
+    const total = tot[t.code] || 0;
+    if (!total) continue;
+    const owners = state.players
+      .map((p, i) => ({ color: PLAYER_COLORS[i % 10], n: p.shares[t.code] || 0 }))
+      .filter((o) => o.n > 0);
+    if (owners.length) map[t.code] = { total, owners };
+  }
+  return map;
+}
+
+function flattenBracket(tree, ownersMap) {
+  if (!tree) return { nodes: [], champion: null };
+  const { root, totalSlots } = tree;
+  const nodes = [];
+
+  function visit(node) {
+    if (node.kids) { visit(node.kids[0]); visit(node.kids[1]); }
+    const ring = BRACKET_RINGS[node.stage];
+    if (!ring) return; // stage unknown (feed not loaded yet) — nothing to draw
+    const [angleA, angleB] = node.kids
+      ? [bracketMidAngle(node.kids[0], totalSlots), bracketMidAngle(node.kids[1], totalSlots)]
+      : [bracketSlotAngle(node.start, totalSlots), bracketSlotAngle(node.start + 1, totalSlots)];
+    const f = node.fixture;
+    nodes.push({
+      num: node.num,
+      stage: node.stage,
+      fixture: f,
+      ring,
+      selfAngle: bracketMidAngle(node, totalSlots),
+      teamA: { code: f?.a, angle: angleA, owners: ownersMap[f?.a] || null },
+      teamB: { code: f?.b, angle: angleB, owners: ownersMap[f?.b] || null },
+    });
+  }
+  visit(root);
+
+  let champion = null;
+  if (root.fixture?.outcome) {
+    champion = root.fixture.outcome === "a" ? root.fixture.a : root.fixture.b;
+  }
+  return { nodes, champion };
+}
+
+function BracketSlot({ code, angle, radius, size }) {
+  const { x, y } = bracketPt(angle, radius);
+  const known = !!TEAM[code];
+  if (!known) {
+    return <circle cx={x} cy={y} r={Math.max(3, size * 0.4)} fill={T.soft} stroke={T.line} strokeWidth="1" strokeDasharray="2 2" />;
+  }
+  return <FlagGlyphSvg code={code} x={x} y={y} size={size} />;
+}
+
+// Which ring a team's advancement line runs on to next, and the arc it
+// sweeps along its own ring to join its opponent's line into one trunk —
+// the same "two lines merge into one" shape as a printed tournament bracket.
+const BRACKET_STAGE_NEXT = { r32: "r16", r16: "qf", qf: "sf", sf: "final", final: null };
+
+function bracketRingMid(stage) {
+  const r = BRACKET_RINGS[stage];
+  return (r.rOuter + r.rInner) / 2;
+}
+
+// A fairly wide fixed-width ribbon, split lengthwise into one band per
+// owner — each band's share of that width is proportional to that owner's
+// shares out of the team's total. A single owner just gets one solid band.
+const BRACKET_RIBBON_WIDTH = 11;
+
+// Every band of an ownership ribbon is a fixed offset from the route's
+// centerline, proportional to that owner's share of the team's total.
+function ribbonBands(ownership) {
+  const { total, owners } = ownership;
+  if (!total || !owners.length) return [];
+  let cursor = -0.5; // fraction of BRACKET_RIBBON_WIDTH, start at one edge
+  return owners.map((o) => {
+    const frac = o.n / total;
+    const bandStart = cursor;
+    cursor += frac;
+    return { color: o.color, offset: ((bandStart + cursor) / 2) * BRACKET_RIBBON_WIDTH, width: Math.max(frac * BRACKET_RIBBON_WIDTH, 1) };
+  });
+}
+
+// A team's ribbon runs from their own flag to wherever they end up this
+// round — the arc's midpoint if eliminated, or the next round's flag if
+// they win, described as a list of {angle, radius} waypoints: a radial hop
+// (angle fixed) out to the ring boundary, an arc hop (radius fixed) around
+// to the merge point, then optionally another radial hop onward. A
+// two-point bezier between just the endpoints (tried first) cuts a
+// generic diagonal-ish curve that doesn't track the ring structure very
+// closely. Instead, sample the true route densely — exact for both hop
+// types, since linear interpolation of radius-at-fixed-angle is a straight
+// line and linear interpolation of angle-at-fixed-radius is the arc
+// itself — then offset every sample along its own *local* tangent (from
+// its neighbours, not a per-hop formula) and thread a Catmull-Rom curve
+// through the result. The tangent rotates smoothly through the bend where
+// a radial hop meets an arc hop, so there's no seam or self-intersection
+// to patch up, and the curve hugs the actual angles instead of a generic
+// point-to-point bezier.
+function routeSamples(waypoints, perHop = 14) {
+  const pts = [];
+  for (let i = 1; i < waypoints.length; i++) {
+    const a = waypoints[i - 1], b = waypoints[i];
+    for (let s = i === 1 ? 0 : 1; s <= perHop; s++) {
+      const t = s / perHop;
+      pts.push(bracketPt(a.angle + (b.angle - a.angle) * t, a.radius + (b.radius - a.radius) * t));
+    }
+  }
+  return pts;
+}
+function offsetSamples(pts, offset) {
+  return pts.map((p, i) => {
+    const prev = pts[Math.max(0, i - 1)], next = pts[Math.min(pts.length - 1, i + 1)];
+    const dx = next.x - prev.x, dy = next.y - prev.y;
+    const len = Math.hypot(dx, dy) || 1;
+    return { x: p.x - (dy / len) * offset, y: p.y + (dx / len) * offset };
+  });
+}
+const ribbonLine = d3Line().x((d) => d.x).y((d) => d.y).curve(curveCatmullRom.alpha(0.5));
+function ribbonBandPath(waypoints, offset) {
+  return ribbonLine(offsetSamples(routeSamples(waypoints), offset));
+}
+
+// One team's full ownership ribbon for this round, band by band.
+function RibbonPath({ waypoints, ownership }) {
+  if (!ownership) return null;
+  const bands = ribbonBands(ownership);
+  if (!bands.length) return null;
+  return (
+    <g fill="none" strokeLinecap="butt">
+      {bands.map((b, i) => <path key={i} d={ribbonBandPath(waypoints, b.offset)} stroke={b.color} strokeWidth={b.width} />)}
+    </g>
+  );
+}
+
+function BracketConnector({ node }) {
+  const { ring, stage, teamA, teamB, selfAngle, fixture } = node;
+  const ringMid = (ring.rOuter + ring.rInner) / 2;
+  const pA1 = bracketPt(teamA.angle, ringMid), pA2 = bracketPt(teamA.angle, ring.rInner);
+  const pB1 = bracketPt(teamB.angle, ringMid), pB2 = bracketPt(teamB.angle, ring.rInner);
+  const sweep = teamB.angle >= teamA.angle ? 1 : 0;
+  const arcPath = `M ${pA2.x} ${pA2.y} A ${ring.rInner} ${ring.rInner} 0 0 ${sweep} ${pB2.x} ${pB2.y}`;
+
+  const nextStage = BRACKET_STAGE_NEXT[stage];
+  const trunkEndRadius = nextStage ? bracketRingMid(nextStage) : 0;
+  const trunkStart = bracketPt(selfAngle, ring.rInner);
+  const trunkEnd = bracketPt(selfAngle, trunkEndRadius);
+
+  // Both teams get their ribbon highlighted, win or lose — a winner's
+  // route continues on to the next round's flag, a loser's just ends at
+  // the arc's midpoint.
+  const routeFor = (team, isWinner) => {
+    const wp = [
+      { angle: team.angle, radius: ringMid },
+      { angle: team.angle, radius: ring.rInner },
+      { angle: selfAngle, radius: ring.rInner },
+    ];
+    if (isWinner) wp.push({ angle: selfAngle, radius: trunkEndRadius });
+    return wp;
+  };
+
+  return (
+    <g>
+      <g fill="none" stroke={T.sub} strokeWidth="1.25" strokeLinecap="round" opacity="0.6">
+        <line x1={pA1.x} y1={pA1.y} x2={pA2.x} y2={pA2.y} />
+        <line x1={pB1.x} y1={pB1.y} x2={pB2.x} y2={pB2.y} />
+        <path d={arcPath} />
+        <line x1={trunkStart.x} y1={trunkStart.y} x2={trunkEnd.x} y2={trunkEnd.y} />
+      </g>
+      <RibbonPath waypoints={routeFor(teamA, fixture?.outcome === "a")} ownership={teamA.owners} />
+      <RibbonPath waypoints={routeFor(teamB, fixture?.outcome === "b")} ownership={teamB.owners} />
+    </g>
+  );
+}
+
+function BracketView({ state }) {
+  const tree = useMemo(() => buildBracketTree(state), [state.knockoutFixtures]);
+  const ownersMap = useMemo(() => teamOwnersMap(state), [state.players]);
+  const { nodes, champion } = useMemo(() => flattenBracket(tree, ownersMap), [tree, ownersMap]);
+
+  if (!tree) {
+    return (
+      <Card style={{ padding: 20, textAlign: "center", color: T.sub, fontSize: 13 }}>
+        The bracket fills in once the knockout schedule is live.
+      </Card>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <Card style={{ padding: "12px 4px 4px" }}>
+        <svg viewBox={`0 0 ${BRACKET_SIZE} ${BRACKET_SIZE}`} width="100%" style={{ display: "block" }}>
+          {nodes.map((n) => <BracketConnector key={"c" + n.num} node={n} />)}
+          {nodes.map((n) => (
+            <g key={n.num}>
+              <BracketSlot code={n.teamA.code} angle={n.teamA.angle} radius={(n.ring.rOuter + n.ring.rInner) / 2} size={n.ring.flagSize} />
+              <BracketSlot code={n.teamB.code} angle={n.teamB.angle} radius={(n.ring.rOuter + n.ring.rInner) / 2} size={n.ring.flagSize} />
+            </g>
+          ))}
+          {champion ? (
+            <FlagGlyphSvg code={champion} x={BRACKET_CENTER} y={BRACKET_CENTER} size={BRACKET_CHAMPION_SIZE} />
+          ) : (
+            <g transform={`translate(${BRACKET_CENTER - 11}, ${BRACKET_CENTER - 11})`}>
+              <Trophy size={22} color={T.sub} />
+            </g>
+          )}
+        </svg>
+      </Card>
+      {tree.third?.fixture && (
+        <Card style={{ padding: 12, fontSize: 13 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: T.sub, letterSpacing: 1, marginBottom: 6 }}>THIRD PLACE</div>
+          <div className="flex items-center gap-2">
+            {TEAM[tree.third.fixture.a] ? <FlagGlyphHtml code={tree.third.fixture.a} /> : <span>🏳️</span>}
+            <b style={{ flex: 1 }}>{TEAM[tree.third.fixture.a]?.name ?? tree.third.fixture.a}</b>
+            <span style={{ color: T.sub }}>v</span>
+            <b style={{ flex: 1, textAlign: "right" }}>{TEAM[tree.third.fixture.b]?.name ?? tree.third.fixture.b}</b>
+            {TEAM[tree.third.fixture.b] ? <FlagGlyphHtml code={tree.third.fixture.b} /> : <span>🏳️</span>}
+          </div>
+        </Card>
+      )}
+    </div>
+  );
+}
+
 /* ---------- views ---------- */
 
 function Leaderboard({ state }) {
@@ -648,7 +975,7 @@ function Leaderboard({ state }) {
   return (
     <div className="flex flex-col gap-2">
       <div className="flex gap-1" style={{ background: T.soft, borderRadius: 10, padding: 3 }}>
-        {[["table", "Table"], ["race", "Race"]].map(([id, label]) => (
+        {[["table", "Table"], ["race", "Race"], ["bracket", "Bracket"]].map(([id, label]) => (
           <button key={id} onClick={() => setMode(id)}
             style={{ flex: 1, padding: 8, borderRadius: 8, fontSize: 13, fontWeight: 700,
               background: mode === id ? T.card : "transparent",
@@ -674,6 +1001,7 @@ function Leaderboard({ state }) {
           </div>
         </Card>
       )}
+      {mode === "bracket" && <BracketView state={state} />}
       {mode === "table" && board.map((p, i) => {
         const color = PLAYER_COLORS[state.players.findIndex((x) => x.id === p.id) % 10];
         const isOpen = open === p.id;
@@ -990,6 +1318,79 @@ const STAGE2LABEL = {
   sf: "Semi-final", third: "Third place", final: "Final",
 };
 
+// The 2026 bracket's match numbering (FIFA's official 73–104) is fixed for
+// the whole tournament, independent of results — it's published as part of
+// the pre-tournament draw. Rather than re-deriving it from scratch, this
+// mirrors what the openfootball feed itself encodes: every not-yet-resolved
+// knockout fixture names its own feeder matches directly in its team fields
+// (e.g. team1 "W74" = "winner of match 74"). Each entry below is
+// [matchNum, [feederA, feederB]]; matchNum 104 (the final) is the bracket's
+// root, matchNum 103 (third place) shares the final's semi-final feeders
+// but takes their losers instead of their winners.
+const BRACKET_LINKS = {
+  89: [74, 77], 90: [73, 75], 91: [76, 78], 92: [79, 80],
+  93: [83, 84], 94: [81, 82], 95: [86, 88], 96: [85, 87],
+  97: [89, 90], 98: [93, 94], 99: [91, 92], 100: [95, 96],
+  101: [97, 98], 102: [99, 100],
+  103: [101, 102], 104: [101, 102],
+};
+const BRACKET_ROOT = 104;
+const THIRD_PLACE_NUM = 103;
+const BRACKET_STAGE_ORDER = ["r32", "r16", "qf", "sf", "final"];
+
+// Build the radial bracket tree: a node per knockout match (73–104, minus
+// the third-place match which sits outside the winners' lineage), each
+// carrying the [start,end) range of Round-of-32 "slots" it descends from —
+// used to lay every match out at a stable angular position, nested so a
+// round's matches always span exactly the arc of their two feeder matches.
+function buildBracketTree(state) {
+  const byNum = {};
+  for (const f of state.knockoutFixtures || []) {
+    if (f.num != null) byNum[f.num] = f;
+  }
+  if (!byNum[BRACKET_ROOT] && Object.keys(byNum).length === 0) return null;
+
+  function build(num) {
+    const fixture = byNum[num] || null;
+    const kids = BRACKET_LINKS[num];
+    if (!kids) {
+      // Round-of-32 leaf: two individual slots, no feeders of its own.
+      return { num, stage: "r32", fixture, kids: null, start: null, end: null };
+    }
+    const [k0, k1] = kids.map(build);
+    return {
+      num,
+      stage: fixture ? fixture.stage : null,
+      fixture,
+      kids: [k0, k1],
+      start: null, // filled in by assignSlots
+      end: null,
+    };
+  }
+  const root = build(BRACKET_ROOT);
+  const third = byNum[THIRD_PLACE_NUM]
+    ? { num: THIRD_PLACE_NUM, stage: "third", fixture: byNum[THIRD_PLACE_NUM] }
+    : null;
+
+  // Assign each Round-of-32 leaf a slot index via left-to-right DFS, then
+  // propagate [start,end) ranges bottom-up so every ancestor's arc is the
+  // union of its two children's arcs (guaranteed contiguous by DFS order).
+  let nextSlot = 0;
+  function assignSlots(node) {
+    if (!node.kids) {
+      node.start = nextSlot; nextSlot += 2; node.end = node.start + 2;
+      return;
+    }
+    assignSlots(node.kids[0]);
+    assignSlots(node.kids[1]);
+    node.start = node.kids[0].start;
+    node.end = node.kids[1].end;
+  }
+  assignSlots(root);
+
+  return { root, third, totalSlots: nextSlot };
+}
+
 // Turn the openfootball file into {matches, advanced, knockoutFixtures} our scorer understands.
 function parseFeed(data) {
   const matches = [];
@@ -998,13 +1399,26 @@ function parseFeed(data) {
   for (const m of data.matches || []) {
     const knockoutStage = ROUND2STAGE[m.round];
     if (knockoutStage) {
-      // Collect knockout fixture whether or not teams are resolved yet
+      // Collect knockout fixture whether or not teams are resolved yet.
+      // Also resolve its own outcome here (independent of team-code
+      // resolution below) so the bracket view doesn't need a second pass.
+      let koOutcome = null, koScore = null;
+      const sc0 = m.score;
+      if (sc0 && sc0.ft) {
+        let [x, y] = sc0.ft;
+        if (x === y && sc0.et) [x, y] = sc0.et;
+        if (x === y && sc0.p) [x, y] = sc0.p;
+        if (x !== y) { koOutcome = x > y ? "a" : "b"; koScore = sc0.ft; }
+      }
       knockoutFixtures.push({
+        num: m.num || null,
         date: m.date,
         time: m.time || null,
         a: NAME2CODE[m.team1] || m.team1,
         b: NAME2CODE[m.team2] || m.team2,
         stage: knockoutStage,
+        outcome: koOutcome,
+        score: koScore,
       });
     }
     const a = NAME2CODE[m.team1], b = NAME2CODE[m.team2];
