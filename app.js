@@ -1197,6 +1197,21 @@ function isPostRecent(dateStr) {
   const daysOld = (Date.now() - postDate.getTime()) / (24 * 60 * 60 * 1e3);
   return daysOld < 2;
 }
+const TABLE_LINE_RE = /^\S.*\s{2,}\d+(?:\.\d+)?%$/;
+function renderPostBody(body) {
+  const lines = body.split("\n");
+  let start = -1, end = -1;
+  for (let i = 0; i < lines.length; i++) {
+    if (TABLE_LINE_RE.test(lines[i])) {
+      if (start === -1) start = i;
+      end = i;
+    } else if (start !== -1) {
+      break;
+    }
+  }
+  if (start === -1 || end === start) return body;
+  return /* @__PURE__ */ React.createElement(React.Fragment, null, lines.slice(0, start).join("\n"), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: MONO } }, lines.slice(start, end + 1).join("\n")), lines.slice(end + 1).join("\n"));
+}
 function NewsfeedView() {
   const [posts, setPosts] = useState(null);
   const [error, setError] = useState(false);
@@ -1241,7 +1256,7 @@ function NewsfeedView() {
       },
       /* @__PURE__ */ React.createElement("span", { style: { fontWeight: 800, fontSize: 16, flex: 1 } }, post.title || "Update"),
       /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, flexShrink: 0 } }, post.date && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: T.sub } }, fmtPost(post.date)), isOpen ? /* @__PURE__ */ React.createElement(ChevronUp, { size: 16, color: T.sub }) : /* @__PURE__ */ React.createElement(ChevronDown, { size: 16, color: T.sub }))
-    ), isOpen && /* @__PURE__ */ React.createElement("div", { style: { padding: "0 16px 14px", borderTop: `1px solid ${T.line}` } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, lineHeight: 1.7, color: T.ink, whiteSpace: "pre-wrap", paddingTop: 12 } }, post.body), post.author && /* @__PURE__ */ React.createElement("div", { style: { marginTop: 10, fontSize: 11, color: T.sub, fontWeight: 700 } }, "\u2014 ", post.author)));
+    ), isOpen && /* @__PURE__ */ React.createElement("div", { style: { padding: "0 16px 14px", borderTop: `1px solid ${T.line}` } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, lineHeight: 1.7, color: T.ink, whiteSpace: "pre-wrap", paddingTop: 12 } }, renderPostBody(post.body)), post.author && /* @__PURE__ */ React.createElement("div", { style: { marginTop: 10, fontSize: 11, color: T.sub, fontWeight: 700 } }, "\u2014 ", post.author)));
   }));
 }
 function App() {

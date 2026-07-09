@@ -1538,6 +1538,33 @@ function isPostRecent(dateStr) {
   return daysOld < 2;
 }
 
+// Posts sometimes contain a space-padded "Team    NN.N%" odds table. That
+// padding only lines up in a monospace font, so find the run of table-shaped
+// lines and render just that block in MONO — everything else stays in the
+// post's normal font.
+const TABLE_LINE_RE = /^\S.*\s{2,}\d+(?:\.\d+)?%$/;
+
+function renderPostBody(body) {
+  const lines = body.split("\n");
+  let start = -1, end = -1;
+  for (let i = 0; i < lines.length; i++) {
+    if (TABLE_LINE_RE.test(lines[i])) {
+      if (start === -1) start = i;
+      end = i;
+    } else if (start !== -1) {
+      break;
+    }
+  }
+  if (start === -1 || end === start) return body;
+  return (
+    <>
+      {lines.slice(0, start).join("\n")}
+      <span style={{ fontFamily: MONO }}>{lines.slice(start, end + 1).join("\n")}</span>
+      {lines.slice(end + 1).join("\n")}
+    </>
+  );
+}
+
 function NewsfeedView() {
   const [posts, setPosts] = useState(null);   // null = loading, [] = empty
   const [error, setError] = useState(false);
@@ -1607,7 +1634,7 @@ function NewsfeedView() {
             {isOpen && (
               <div style={{ padding: "0 16px 14px", borderTop: `1px solid ${T.line}` }}>
                 <div style={{ fontSize: 14, lineHeight: 1.7, color: T.ink, whiteSpace: "pre-wrap", paddingTop: 12 }}>
-                  {post.body}
+                  {renderPostBody(post.body)}
                 </div>
                 {post.author && (
                   <div style={{ marginTop: 10, fontSize: 11, color: T.sub, fontWeight: 700 }}>
