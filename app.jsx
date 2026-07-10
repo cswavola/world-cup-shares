@@ -86,11 +86,29 @@ function playerTeamRaceData(state, playerShares) {
 }
 
 /* ---- charts, drawn in plain SVG (no chart library) ---- */
+// Builds an x-scale that gives each phase (the span between milestone
+// boundaries) equal width, instead of width proportional to match count.
+// Points within a phase are still placed linearly by data index.
+function phaseSpacedX(n, milestones, innerW, left) {
+  if (n <= 1) return () => left;
+  const raw = [0, ...milestones.map((m) => m.dataIndex), n - 1];
+  const bounds = raw.filter((b, i) => i === 0 || b !== raw[i - 1]);
+  const segs = bounds.length - 1;
+  return (i) => {
+    if (segs <= 0) return left;
+    let s = 0;
+    while (s < segs - 1 && i > bounds[s + 1]) s++;
+    const segStart = bounds[s], segEnd = bounds[s + 1];
+    const frac = segEnd === segStart ? 0 : (i - segStart) / (segEnd - segStart);
+    return left + ((s + frac) / segs) * innerW;
+  };
+}
+
 function RaceChart({ data, players, milestones = [] }) {
   const W = 320, H = 190, P = { l: 26, r: 8, t: 8, b: 16 };
   const n = data.length;
   const maxV = Math.max(0.5, ...data.flatMap((d) => players.map((p) => d[p.name] || 0)));
-  const x = (i) => P.l + (n <= 1 ? 0 : (i * (W - P.l - P.r)) / (n - 1));
+  const x = phaseSpacedX(n, milestones, W - P.l - P.r, P.l);
   const y = (v) => H - P.b - (v / maxV) * (H - P.t - P.b);
   const ticks = 4;
   return (
