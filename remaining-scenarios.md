@@ -47,3 +47,38 @@ semi). **Final** = winner of the Final (Spain vs. the semi winner).
   overtake Lauren in that one scenario, though never Ben.
 - **Jess, Tim, and Cosmo have no path to the podium** — their best finishes
   are all 4th place or worse.
+
+## Hypothetical: if Cosmo were not in the competition
+
+Removing Cosmo's shares (FRA 2, NED 2, NOR 1, ARG 1, GER 1, ENG 1) from the
+pool inflates everyone else's points (his shares no longer dilute the
+denominator for those teams), but **the relative order among the remaining
+6 players is identical in every one of the 8 scenarios** — nothing about
+who wins or who can/can't reach the podium changes.
+
+| SF | 3rd | Final | 1st | 2nd | 3rd | 4th | 5th | 6th |
+|---|---|---|---|---|---|---|---|---|
+| ENG | FRA | ESP | Ben 37.9 | Lauren 34.7 | Queen C 30.3 | Jess 29.4 | Ryan 27.5 | Tim 23.1 |
+| ENG | FRA | ENG | Ben 39.1 | Ryan 36.7 | Lauren 35.8 | Queen C 30.9 | Jess 21.4 | Tim 19.1 |
+| ENG | ARG | ESP | Ben 37.0 | Lauren 36.5 | Queen C 32.1 | Jess 27.6 | Ryan 27.5 | Tim 22.2 |
+| ENG | ARG | ENG | Ben 38.2 | Lauren 37.6 | Ryan 36.7 | Queen C 32.7 | Jess 19.6 | Tim 18.2 |
+| ARG | FRA | ESP | Ben 35.1 | Lauren 33.7 | Queen C 31.6 | Jess 31.2 | Tim 26.7 | Ryan 24.7 |
+| ARG | FRA | ARG | **Queen C 34.7** | Lauren 32.8 | Ben 30.7 | Tim 29.8 | Ryan 28.3 | Jess 26.8 |
+| ARG | ENG | ESP | **Lauren 35.9** | Ben 35.6 | Queen C 32.8 | Jess 28.5 | Ryan 26.1 | Tim 24.0 |
+| ARG | ENG | ARG | **Queen C 35.9** | Lauren 35.1 | Ben 31.2 | Ryan 29.7 | Tim 27.1 | Jess 24.1 |
+
+Per-player rank range (6-player field):
+
+| Player | Best | Worst |
+|---|---|---|
+| Ben | 1st | 3rd |
+| Lauren | 1st | 3rd |
+| Queen C | 1st | 4th |
+| Ryan | 2nd | 6th |
+| Tim | 4th | 6th |
+| Jess | 4th | 6th |
+
+Ben still wins 5/8, Queen C 2/8, Lauren 1/8 — same conditions as with Cosmo
+included. Ryan still peaks at 2nd (same scenario) and still never overtakes
+Ben. Cosmo's shares were spread broadly enough that removing him just
+inflates everyone's totals proportionally rather than reordering anyone.
